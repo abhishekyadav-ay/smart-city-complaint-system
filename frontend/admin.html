@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart City — Admin Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="admin-page">
+
+  <!-- Login Screen -->
+  <div class="login-screen" id="loginScreen">
+    <div class="login-bg"></div>
+    <div class="login-card">
+      <div class="login-logo">
+        <span style="font-size:2.5rem;">🏙️</span>
+        <h1 class="login-title">SmartCity Admin</h1>
+        <p class="login-sub">City Issue Management Portal</p>
+      </div>
+      <form id="loginForm" class="login-form">
+        <div class="form-group">
+          <label class="form-label" for="loginUser">Username</label>
+          <div class="input-wrap">
+            <span class="input-icon">👤</span>
+            <input type="text" id="loginUser" class="form-input" placeholder="Enter username" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="loginPass">Password</label>
+          <div class="input-wrap">
+            <span class="input-icon">🔒</span>
+            <input type="password" id="loginPass" class="form-input" placeholder="Enter password" required />
+            <button type="button" class="toggle-pass" id="togglePass">👁️</button>
+          </div>
+        </div>
+        <div class="login-error" id="loginError" style="display:none;"></div>
+        <button type="submit" class="submit-btn login-btn" id="loginBtn">
+          <span class="btn-text">Sign In</span>
+          <span class="btn-icon">→</span>
+        </button>
+        <p class="login-hint">Default: admin / admin123</p>
+      </form>
+      <a href="index.html" class="back-link">← Back to Complaint Form</a>
+    </div>
+  </div>
+
+  <!-- Admin Dashboard -->
+  <div class="admin-layout" id="adminLayout" style="display:none;">
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <span class="logo-icon">🏙️</span>
+        <span class="logo-text">SmartCity</span>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#" class="sidebar-link active" data-tab="dashboard">
+          <span class="link-icon">📊</span>
+          <span class="link-text">Dashboard</span>
+        </a>
+        <a href="#" class="sidebar-link" data-tab="complaints">
+          <span class="link-icon">📋</span>
+          <span class="link-text">Complaints</span>
+          <span class="link-badge" id="pendingBadge">0</span>
+        </a>
+        <a href="#" class="sidebar-link" data-tab="analytics">
+          <span class="link-icon">📈</span>
+          <span class="link-text">Analytics</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="admin-info">
+          <span class="admin-avatar">👤</span>
+          <div>
+            <p class="admin-name" id="adminName">Admin</p>
+            <p class="admin-role">City Administrator</p>
+          </div>
+        </div>
+        <button class="logout-btn" id="logoutBtn" title="Logout">⬅️</button>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="admin-main">
+
+      <!-- Top Bar -->
+      <div class="topbar">
+        <button class="menu-toggle" id="menuToggle">☰</button>
+        <div class="topbar-title" id="topbarTitle">Dashboard</div>
+        <div class="topbar-actions">
+          <button class="refresh-btn" id="refreshBtn" title="Refresh data">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
+            </svg>
+          </button>
+          <a href="index.html" class="topbar-link">View Public Form ↗</a>
+        </div>
+      </div>
+
+      <!-- ===== DASHBOARD TAB ===== -->
+      <div class="tab-content active" id="tab-dashboard">
+        <div class="page-header">
+          <h2 class="page-title">Overview</h2>
+          <p class="page-sub">Real-time city issue monitoring</p>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="kpi-grid">
+          <div class="kpi-card kpi-total">
+            <div class="kpi-icon">📋</div>
+            <div class="kpi-info">
+              <p class="kpi-label">Total Complaints</p>
+              <p class="kpi-value" id="kpi-total">—</p>
+              <p class="kpi-trend" id="kpi-recent">—</p>
+            </div>
+          </div>
+          <div class="kpi-card kpi-pending">
+            <div class="kpi-icon">⏳</div>
+            <div class="kpi-info">
+              <p class="kpi-label">Pending</p>
+              <p class="kpi-value" id="kpi-pending">—</p>
+              <p class="kpi-trend">Awaiting action</p>
+            </div>
+          </div>
+          <div class="kpi-card kpi-progress">
+            <div class="kpi-icon">🔧</div>
+            <div class="kpi-info">
+              <p class="kpi-label">In Progress</p>
+              <p class="kpi-value" id="kpi-inprogress">—</p>
+              <p class="kpi-trend">Being worked on</p>
+            </div>
+          </div>
+          <div class="kpi-card kpi-resolved">
+            <div class="kpi-icon">✅</div>
+            <div class="kpi-info">
+              <p class="kpi-label">Resolved</p>
+              <p class="kpi-value" id="kpi-resolved">—</p>
+              <p class="kpi-trend" id="kpi-rate">—</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="charts-row">
+          <div class="chart-card chart-large">
+            <div class="chart-header">
+              <h3>Daily Trend <span class="chart-period">(Last 14 days)</span></h3>
+            </div>
+            <div class="chart-body">
+              <canvas id="trendChart"></canvas>
+            </div>
+          </div>
+          <div class="chart-card chart-small">
+            <div class="chart-header">
+              <h3>By Category</h3>
+            </div>
+            <div class="chart-body">
+              <canvas id="categoryChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Complaints -->
+        <div class="section-card">
+          <div class="section-card-header">
+            <h3>Recent Complaints</h3>
+            <button class="text-btn" id="viewAllBtn">View All →</button>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table" id="recentTable">
+              <thead>
+                <tr>
+                  <th>Complainant</th>
+                  <th>Issue</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="recentTableBody">
+                <tr><td colspan="6" class="table-empty">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== COMPLAINTS TAB ===== -->
+      <div class="tab-content" id="tab-complaints">
+        <div class="page-header">
+          <h2 class="page-title">All Complaints</h2>
+          <p class="page-sub">Manage and update citizen reported issues</p>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-bar">
+          <div class="filter-group">
+            <label class="filter-label">Status</label>
+            <select class="filter-select" id="filterStatus">
+              <option value="">All Status</option>
+              <option value="Pending">Pending</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Resolved">Resolved</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <label class="filter-label">Category</label>
+            <select class="filter-select" id="filterCategory">
+              <option value="">All Categories</option>
+              <option value="Pothole">Pothole</option>
+              <option value="Garbage">Garbage</option>
+              <option value="Streetlight">Streetlight</option>
+              <option value="Water Issue">Water Issue</option>
+              <option value="Others">Others</option>
+            </select>
+          </div>
+          <div class="filter-group filter-search">
+            <label class="filter-label">Search</label>
+            <input type="text" class="filter-input" id="searchInput" placeholder="Name, location..." />
+          </div>
+          <button class="apply-btn" id="applyFilters">Apply Filters</button>
+          <button class="clear-btn" id="clearFilters">Clear</button>
+        </div>
+
+        <!-- Complaints Table -->
+        <div class="section-card">
+          <div class="table-wrap">
+            <table class="data-table" id="complaintsTable">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Category</th>
+                  <th>Location</th>
+                  <th>Status</th>
+                  <th>Submitted</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="complaintsTableBody">
+                <tr><td colspan="8" class="table-empty">Loading complaints...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination" id="pagination"></div>
+        </div>
+      </div>
+
+      <!-- ===== ANALYTICS TAB ===== -->
+      <div class="tab-content" id="tab-analytics">
+        <div class="page-header">
+          <h2 class="page-title">Analytics</h2>
+          <p class="page-sub">Data insights and reporting metrics</p>
+        </div>
+
+        <!-- Analytics KPIs -->
+        <div class="kpi-grid">
+          <div class="kpi-card kpi-total">
+            <div class="kpi-icon">📊</div>
+            <div class="kpi-info">
+              <p class="kpi-label">Total Issues</p>
+              <p class="kpi-value" id="an-total">—</p>
+            </div>
+          </div>
+          <div class="kpi-card kpi-resolved">
+            <div class="kpi-icon">📈</div>
+            <div class="kpi-info">
+              <p class="kpi-label">Resolution Rate</p>
+              <p class="kpi-value" id="an-rate">—</p>
+            </div>
+          </div>
+          <div class="kpi-card kpi-progress">
+            <div class="kpi-icon">🏆</div>
+            <div class="kpi-info">
+              <p class="kpi-label">Most Frequent Issue</p>
+              <p class="kpi-value an-small" id="an-frequent">—</p>
+            </div>
+          </div>
+          <div class="kpi-card kpi-pending">
+            <div class="kpi-icon">⏱️</div>
+            <div class="kpi-info">
+              <p class="kpi-label">Avg Resolution Time</p>
+              <p class="kpi-value an-small" id="an-avgtime">—</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Three Charts -->
+        <div class="charts-row">
+          <div class="chart-card">
+            <div class="chart-header"><h3>Category Distribution</h3></div>
+            <div class="chart-body"><canvas id="categoryPieChart"></canvas></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header"><h3>Category Comparison</h3></div>
+            <div class="chart-body"><canvas id="categoryBarChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="charts-row">
+          <div class="chart-card chart-full">
+            <div class="chart-header">
+              <h3>30-Day Complaint Trend</h3>
+              <select class="chart-period-select" id="trendDays">
+                <option value="7">Last 7 days</option>
+                <option value="14">Last 14 days</option>
+                <option value="30" selected>Last 30 days</option>
+              </select>
+            </div>
+            <div class="chart-body"><canvas id="trendAreaChart"></canvas></div>
+          </div>
+        </div>
+
+        <!-- Status Breakdown -->
+        <div class="section-card">
+          <div class="section-card-header"><h3>Status Breakdown</h3></div>
+          <div class="status-bars" id="statusBars"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Complaint Detail Modal -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal" id="complaintModal">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modalTitle">Complaint Details</h3>
+        <button class="modal-close" id="modalClose">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody">
+        <!-- Filled dynamically -->
+      </div>
+      <div class="modal-footer">
+        <div class="status-update-row">
+          <label class="form-label">Update Status</label>
+          <div class="status-row">
+            <select class="filter-select" id="modalStatus">
+              <option value="Pending">Pending</option>
+              <option value="In Progress">In Progress</option>
+              <option value="Resolved">Resolved</option>
+            </select>
+            <textarea class="form-textarea small-textarea" id="modalNotes" placeholder="Admin notes (optional)..." rows="2"></textarea>
+            <button class="submit-btn modal-save-btn" id="modalSave">Update</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script src="js/admin.js"></script>
+</body>
+</html>

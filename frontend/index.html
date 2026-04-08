@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart City — Report an Issue</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Serif+Display&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="report-page">
+
+  <!-- Navigation -->
+  <nav class="navbar">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo">
+        <span class="logo-icon">🏙️</span>
+        <span class="logo-text">SmartCity</span>
+      </a>
+      <div class="nav-links">
+        <a href="index.html" class="nav-link active">Report Issue</a>
+        <a href="admin.html" class="nav-link">Admin Portal</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero Section -->
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-content">
+      <div class="hero-badge">
+        <span class="badge-dot"></span>
+        Citizen Reporting System
+      </div>
+      <h1 class="hero-title">Report a City Issue</h1>
+      <p class="hero-sub">Help us build a better city. Your report is automatically categorized using AI and sent directly to the relevant department.</p>
+      <div class="hero-stats">
+        <div class="stat-item">
+          <span id="stat-total" class="stat-num">—</span>
+          <span class="stat-label">Issues Reported</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <span id="stat-resolved" class="stat-num">—</span>
+          <span class="stat-label">Resolved</span>
+        </div>
+        <div class="stat-divider"></div>
+        <div class="stat-item">
+          <span id="stat-rate" class="stat-num">—</span>
+          <span class="stat-label">Resolution Rate</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Form Section -->
+  <section class="form-section">
+    <div class="container">
+      <div class="form-card">
+        <div class="form-header">
+          <h2 class="form-title">Submit Your Complaint</h2>
+          <p class="form-subtitle">All fields marked with * are required. Our AI will automatically detect the issue category.</p>
+        </div>
+
+        <form id="complaintForm" class="complaint-form" enctype="multipart/form-data">
+          <!-- Personal Information -->
+          <div class="form-section-label">
+            <span class="section-num">01</span>
+            Personal Information
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label" for="name">Full Name <span class="required">*</span></label>
+              <div class="input-wrap">
+                <span class="input-icon">👤</span>
+                <input type="text" id="name" name="name" class="form-input" placeholder="John Doe" required />
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="email">Email Address <span class="required">*</span></label>
+              <div class="input-wrap">
+                <span class="input-icon">✉️</span>
+                <input type="email" id="email" name="email" class="form-input" placeholder="john@example.com" required />
+              </div>
+            </div>
+          </div>
+
+          <!-- Location -->
+          <div class="form-section-label">
+            <span class="section-num">02</span>
+            Issue Location
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="address">Address <span class="required">*</span></label>
+            <div class="input-wrap">
+              <span class="input-icon">📍</span>
+              <input type="text" id="address" name="address" class="form-input" placeholder="Type an address or click on the map" required />
+              <button type="button" class="locate-btn" id="locateBtn" title="Use my location">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>
+                </svg>
+              </button>
+            </div>
+            <input type="hidden" id="lat" name="lat" />
+            <input type="hidden" id="lng" name="lng" />
+          </div>
+
+          <!-- Map Container -->
+          <div class="map-container" id="mapContainer">
+            <div id="map"></div>
+            <div class="map-hint">📌 Click anywhere on the map to set location</div>
+          </div>
+
+          <!-- Issue Details -->
+          <div class="form-section-label">
+            <span class="section-num">03</span>
+            Issue Details
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="description">Description <span class="required">*</span></label>
+            <textarea id="description" name="description" class="form-textarea" placeholder="Describe the issue in detail — e.g., 'There is a large pothole on Main Street near the bus stop causing damage to vehicles'" required minlength="10" rows="4"></textarea>
+            <div class="textarea-footer">
+              <span id="charCount" class="char-count">0 characters</span>
+              <button type="button" class="ai-detect-btn" id="aiDetectBtn">
+                <span class="ai-icon">✨</span> AI Detect Category
+              </button>
+            </div>
+          </div>
+
+          <!-- AI Category Display -->
+          <div class="ai-result" id="aiResult" style="display:none;">
+            <div class="ai-result-inner">
+              <span class="ai-label">AI Detected Category:</span>
+              <span class="ai-category" id="aiCategory">—</span>
+              <span class="ai-badge">Auto-detected</span>
+            </div>
+          </div>
+
+          <!-- Issue Type (hidden, set by AI) -->
+          <input type="hidden" id="issueType" name="issueType" />
+
+          <!-- Category Picker (manual override) -->
+          <div class="form-group">
+            <label class="form-label">Issue Category</label>
+            <p class="field-hint">Auto-detected by AI, or select manually below</p>
+            <div class="category-grid">
+              <button type="button" class="cat-btn" data-cat="Pothole">
+                <span class="cat-icon">🕳️</span>
+                <span class="cat-name">Pothole</span>
+              </button>
+              <button type="button" class="cat-btn" data-cat="Garbage">
+                <span class="cat-icon">🗑️</span>
+                <span class="cat-name">Garbage</span>
+              </button>
+              <button type="button" class="cat-btn" data-cat="Streetlight">
+                <span class="cat-icon">💡</span>
+                <span class="cat-name">Streetlight</span>
+              </button>
+              <button type="button" class="cat-btn" data-cat="Water Issue">
+                <span class="cat-icon">💧</span>
+                <span class="cat-name">Water Issue</span>
+              </button>
+              <button type="button" class="cat-btn" data-cat="Others">
+                <span class="cat-icon">📋</span>
+                <span class="cat-name">Others</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Image Upload -->
+          <div class="form-section-label">
+            <span class="section-num">04</span>
+            Photo Evidence
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Upload Image <span class="optional">(Optional)</span></label>
+            <div class="upload-area" id="uploadArea">
+              <input type="file" id="image" name="image" class="file-input" accept="image/*" />
+              <div class="upload-content" id="uploadContent">
+                <div class="upload-icon">📸</div>
+                <p class="upload-text">Drag & drop an image here, or <span class="upload-link">browse files</span></p>
+                <p class="upload-hint">JPEG, PNG, GIF, WEBP up to 5MB</p>
+              </div>
+              <div class="upload-preview" id="uploadPreview" style="display:none;">
+                <img id="previewImg" class="preview-img" src="" alt="Preview" />
+                <button type="button" class="remove-img-btn" id="removeImg">✕</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <div class="form-actions">
+            <button type="submit" class="submit-btn" id="submitBtn">
+              <span class="btn-text">Submit Complaint</span>
+              <span class="btn-icon">→</span>
+            </button>
+          </div>
+        </form>
+
+        <!-- Success Message -->
+        <div class="success-msg" id="successMsg" style="display:none;">
+          <div class="success-icon">✅</div>
+          <h3>Complaint Submitted!</h3>
+          <p id="successText">Your issue has been received and categorized. We'll update you via email once it's resolved.</p>
+          <div class="tracking-info" id="trackingInfo" style="display:none;">
+            <div class="tracking-id">
+              <strong>Tracking ID:</strong> <span id="trackingIdDisplay"></span>
+            </div>
+            <p class="tracking-note">Save this ID to track your complaint status.</p>
+          </div>
+          <button class="reset-btn" id="resetBtn">Submit Another Issue</button>
+        </div>
+      </div>
+
+      <!-- How It Works -->
+      <div class="how-it-works">
+        <h3 class="hiw-title">How It Works</h3>
+        <div class="hiw-steps">
+          <div class="hiw-step">
+            <div class="step-circle">1</div>
+            <div class="step-info">
+              <h4>Submit Your Report</h4>
+              <p>Fill in the complaint form with location and description</p>
+            </div>
+          </div>
+          <div class="hiw-connector"></div>
+          <div class="hiw-step">
+            <div class="step-circle">2</div>
+            <div class="step-info">
+              <h4>AI Categorization</h4>
+              <p>Our AI automatically classifies your issue type</p>
+            </div>
+          </div>
+          <div class="hiw-connector"></div>
+          <div class="hiw-step">
+            <div class="step-circle">3</div>
+            <div class="step-info">
+              <h4>Team Review</h4>
+              <p>City officials review and assign to maintenance teams</p>
+            </div>
+          </div>
+          <div class="hiw-connector"></div>
+          <div class="hiw-step">
+            <div class="step-circle">4</div>
+            <div class="step-info">
+              <h4>Email Update</h4>
+              <p>You get notified by email when your issue is resolved</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Track Your Complaint -->
+      <div class="track-complaint">
+        <h3 class="section-title">Track Your Complaint</h3>
+        <div class="track-form">
+          <div class="track-tabs">
+            <button class="track-tab active" data-tab="id">Track by ID</button>
+            <button class="track-tab" data-tab="email">Track by Email</button>
+          </div>
+          <div class="track-content">
+            <div class="track-panel active" id="track-id-panel">
+              <form id="trackIdForm" class="track-input-form">
+                <div class="form-group">
+                  <label class="form-label" for="trackingId">Tracking ID</label>
+                  <input type="text" id="trackingId" class="form-input" placeholder="Enter your tracking ID (e.g., SC1234567890ABC)" required />
+                </div>
+                <button type="submit" class="track-btn">Track Complaint</button>
+              </form>
+            </div>
+            <div class="track-panel" id="track-email-panel">
+              <form id="trackEmailForm" class="track-input-form">
+                <div class="form-group">
+                  <label class="form-label" for="trackEmail">Email Address</label>
+                  <input type="email" id="trackEmail" class="form-input" placeholder="Enter your email address" required />
+                </div>
+                <button type="submit" class="track-btn">View All Complaints</button>
+              </form>
+            </div>
+          </div>
+        </div>
+        <div class="track-results" id="trackResults" style="display:none;">
+          <div class="track-result-header">
+            <h4>Complaint Status</h4>
+            <button class="close-results" id="closeResults">✕</button>
+          </div>
+          <div id="trackResultContent"></div>
+        </div>
+      </div>
+
+      <!-- Recently Reported Issues -->
+      <div class="recent-complaints">
+        <h3 class="section-title">Recently Reported Issues</h3>
+        <div class="complaints-list" id="complaintsList">
+          <div class="loading-spinner">Loading complaints...</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Toast Notification -->
+  <div class="toast" id="toast"></div>
+
+  <!-- Leaflet Maps (free alternative to Google Maps) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+    // Initialize map when Leaflet is loaded
+    let mapReady = false;
+    document.addEventListener('DOMContentLoaded', function() {
+      if (typeof L !== 'undefined' && document.getElementById('map')) {
+        const map = L.map('map').setView([28.6139, 77.209], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+        window.currentMap = map;
+        mapReady = true;
+        // Trigger map listener setup in main.js
+        if (window.initLeafletMap) initLeafletMap();
+      }
+    });
+  </script>
+  <script src="js/main.js"></script>
+</body>
+</html>
