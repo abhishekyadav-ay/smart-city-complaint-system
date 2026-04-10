@@ -10,20 +10,128 @@ const createTransporter = () => {
   });
 };
 
-const sendResolutionEmail = async (to, name, issueType, complaintId, adminNotes) => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-    console.log('⚠️  Email credentials not configured. Skipping email notification.');
-    return;
+const canSendEmail = () => {
+  const user = process.env.EMAIL_USER || '';
+  const pass = process.env.EMAIL_PASS || '';
+  if (!user || !pass) return false;
+  // Prevent silent confusion when placeholder values are still present.
+  if (user.includes('your-email@gmail.com') || pass.includes('your-gmail-app-password')) {
+    return false;
+  }
+  return true;
+};
+
+const getEmailConfigStatus = () => {
+  const user = process.env.EMAIL_USER || '';
+  const pass = process.env.EMAIL_PASS || '';
+  const hasUser = Boolean(user);
+  const hasPass = Boolean(pass);
+  const usesPlaceholders =
+    user.includes('your-email@gmail.com') || pass.includes('your-gmail-app-password');
+
+  return {
+    configured: hasUser && hasPass && !usesPlaceholders,
+    hasUser,
+    hasPass,
+    usesPlaceholders,
+    userPreview: hasUser ? `${user.slice(0, 3)}***${user.slice(user.indexOf('@'))}` : null
+  };
+};
+
+const verifyEmailConnection = async () => {
+  const status = getEmailConfigStatus();
+  if (!status.configured) {
+    return { ok: false, reason: 'Email credentials not configured properly', ...status };
   }
 
   try {
     const transporter = createTransporter();
+    await transporter.verify();
+    return { ok: true, reason: 'SMTP verified', ...status };
+  } catch (err) {
+    return { ok: false, reason: err.message, ...status };
+  }
+};
 
-    const mailOptions = {
+const sendMail = async ({ to, subject, html }) => {
+  if (!canSendEmail()) {
+    console.log('⚠️  Email credentials not configured. Skipping email notification.');
+    return false;
+  }
+
+  try {
+    const transporter = createTransporter();
+    const info = await transporter.sendMail({
       from: `"Smart City Portal" <${process.env.EMAIL_USER}>`,
       to,
-      subject: '✅ Your Complaint Has Been Resolved — Smart City Portal',
-      html: `
+      subject,
+      html
+    });
+    console.log(`📧 Email sent to ${to} — Message ID: ${info.messageId}`);
+    return true;
+  } catch (err) {
+    console.error('Email sending failed:', err.message);
+    return false;
+  }
+};
+
+const sendComplaintReceivedEmail = async (to, name, issueType, trackingId) => {
+  return sendMail({
+    to,
+    subject: '📌 Complaint Received — Smart City Portal',
+    html: `
+      <div style="font-family:Segoe UI,Arial,sans-serif;max-width:560px;margin:auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
+        <div style="background:linear-gradient(135deg,#1e3a5f,#2563eb);padding:22px 24px;color:#fff">
+          <h2 style="margin:0;font-size:20px;">Smart City Portal</h2>
+          <p style="margin:6px 0 0;opacity:.9;">Complaint submission confirmation</p>
+        </div>
+        <div style="padding:24px;color:#374151">
+          <p style="margin:0 0 12px;">Hello <strong>${name}</strong>,</p>
+          <p style="margin:0 0 14px;line-height:1.6;">We received your complaint for <strong>${issueType}</strong>. Our team will review it and keep you updated.</p>
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:14px">
+            <p style="margin:0 0 6px;font-size:13px;color:#64748b">Tracking ID</p>
+            <p style="margin:0;font-family:monospace;font-weight:700;color:#0f172a">${trackingId || 'N/A'}</p>
+          </div>
+          <p style="margin:14px 0 0;font-size:13px;color:#6b7280">Use this ID to track complaint status from the portal.</p>
+        </div>
+      </div>
+    `
+  });
+};
+
+const sendAdminNewComplaintEmail = async (adminEmail, complaint) => {
+  if (!adminEmail) {
+    return false;
+  }
+
+  return sendMail({
+    to: adminEmail,
+    subject: `🚨 New Complaint Reported — ${complaint.issueType || 'Issue'}`,
+    html: `
+      <div style="font-family:Segoe UI,Arial,sans-serif;max-width:620px;margin:auto;background:#fff;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
+        <div style="background:#0f172a;padding:18px 22px;color:#fff">
+          <h2 style="margin:0;font-size:19px;">New Complaint Alert</h2>
+        </div>
+        <div style="padding:22px;color:#374151">
+          <table width="100%" cellpadding="6" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc">
+            <tr><td style="color:#64748b;width:140px">Tracking ID</td><td><strong>${complaint.trackingId || 'N/A'}</strong></td></tr>
+            <tr><td style="color:#64748b">Name</td><td>${complaint.name || '-'}</td></tr>
+            <tr><td style="color:#64748b">Email</td><td>${complaint.email || '-'}</td></tr>
+            <tr><td style="color:#64748b">Category</td><td>${complaint.issueType || '-'}</td></tr>
+            <tr><td style="color:#64748b">Address</td><td>${complaint.location?.address || '-'}</td></tr>
+            <tr><td style="color:#64748b">Description</td><td>${complaint.description || '-'}</td></tr>
+          </table>
+        </div>
+      </div>
+    `
+  });
+};
+
+const sendResolutionEmail = async (to, name, issueType, complaintId, adminNotes) => {
+  return sendMail({
+    to,
+    subject: '✅ Your Complaint Has Been Resolved — Smart City Portal',
+    html: `
 <!DOCTYPE html>
 <html>
 <head>
@@ -109,34 +217,22 @@ const sendResolutionEmail = async (to, name, issueType, complaintId, adminNotes)
   </table>
 </body>
 </html>
-      `,
-    };
-
-    const info = await transporter.sendMail(mailOptions);
-    console.log(`📧 Resolution email sent to ${to} — Message ID: ${info.messageId}`);
-    return true;
-  } catch (err) {
-    console.error('Email sending failed:', err.message);
-    return false;
-  }
+      `
+  });
 };
 
-const sendStatusUpdateEmail = async (to, name, issueType, status, complaintId) => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) return;
-
+const sendStatusUpdateEmail = async (to, name, issueType, status, complaintId, adminNotes = '') => {
   const statusColors = {
     'In Progress': { bg: '#fef9c3', text: '#854d0e', badge: '#eab308' },
     'Pending': { bg: '#fef2f2', text: '#991b1b', badge: '#ef4444' },
+    'Resolved': { bg: '#dcfce7', text: '#166534', badge: '#22c55e' }
   };
   const colors = statusColors[status] || statusColors['Pending'];
 
-  try {
-    const transporter = createTransporter();
-    await transporter.sendMail({
-      from: `"Smart City Portal" <${process.env.EMAIL_USER}>`,
-      to,
-      subject: `📋 Complaint Update — ${status} | Smart City Portal`,
-      html: `
+  return sendMail({
+    to,
+    subject: `📋 Complaint Update — ${status} | Smart City Portal`,
+    html: `
         <div style="font-family:'Segoe UI',Arial,sans-serif; max-width:500px; margin:auto; background:#fff; border-radius:12px; overflow:hidden; border:1px solid #e2e8f0;">
           <div style="background:linear-gradient(135deg,#1e3a5f,#2563eb); padding:30px; text-align:center;">
             <h2 style="margin:0; color:#fff;">🏙️ Smart City Portal</h2>
@@ -147,15 +243,19 @@ const sendStatusUpdateEmail = async (to, name, issueType, status, complaintId) =
             <div style="text-align:center; margin:20px 0;">
               <span style="background:${colors.bg}; color:${colors.text}; font-weight:700; padding:8px 20px; border-radius:20px; font-size:15px;">Status: ${status}</span>
             </div>
+            ${adminNotes ? `<p style="color:#374151; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px;"><strong>Admin Notes:</strong> ${adminNotes}</p>` : ''}
             <p style="color:#9ca3af; font-size:13px;">We'll notify you again when your issue is fully resolved.</p>
           </div>
         </div>
-      `,
-    });
-    console.log(`📧 Status update email sent to ${to}`);
-  } catch (err) {
-    console.error('Status update email failed:', err.message);
-  }
+      `
+  });
 };
 
-module.exports = { sendResolutionEmail, sendStatusUpdateEmail };
+module.exports = {
+  sendComplaintReceivedEmail,
+  sendAdminNewComplaintEmail,
+  sendResolutionEmail,
+  sendStatusUpdateEmail,
+  getEmailConfigStatus,
+  verifyEmailConnection
+};

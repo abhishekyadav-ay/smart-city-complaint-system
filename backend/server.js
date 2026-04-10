@@ -1,58 +1,85 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '.env') });
+require('dotenv').config();
+const { verifyEmailConnection } = require('./utils/sendEmail');
+
 const connectDB = require('./config/db');
 
 const app = express();
 
-// Connect to MongoDB
+// 🔥 Connect MongoDB
 connectDB();
 
-// Middleware
-const allowedOrigins = [process.env.FRONTEND_URL, 'http://localhost:3000', 'null'].filter(Boolean);
+// 🔐 Security Middleware
+app.use(helmet());
+
+// 🔥 CORS (IMPORTANT for frontend connection)
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin) {
-      return callback(null, true); // allow file:// or browser extensions during development
-    }
-    if (allowedOrigins.includes(origin)) {
+    // Allow file:// (origin null) and same-machine development hosts on any port.
+    if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
       return callback(null, true);
     }
-    const localOriginMatch = origin.match(/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/);
-    if (localOriginMatch) {
-      return callback(null, true);
-    }
-    callback(new Error(`CORS policy blocked origin: ${origin}`));
+    return callback(new Error(`CORS blocked origin: ${origin}`));
   },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
+
+// 🔥 Body Parser
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve uploaded images statically
+// 📁 Static folder for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// API Routes
-app.use('/api/auth', require('./routes/auth'));
+// 🧠 Logger (for debugging)
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
+});
+
+// 🚀 Routes
 app.use('/api/complaints', require('./routes/complaints'));
+app.use('/api/auth', require('./routes/auth'));
 app.use('/api/analytics', require('./routes/analytics'));
 
-// Health check
+// ❤️ Health Check API
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+  res.status(200).json({
+    status: 'OK',
+    message: 'Server is running',
+    time: new Date()
+  });
 });
 
-// Global error handler
+// 📧 Email Health Check
+app.get('/api/health/email', async (req, res) => {
+  const result = await verifyEmailConnection();
+  res.status(result.ok ? 200 : 503).json(result);
+});
+
+// ❌ 404 Handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found'
+  });
+});
+
+// ⚠️ Global Error Handler
 app.use((err, req, res, next) => {
-  console.error('Global error:', err.message);
-  res.status(err.status || 500).json({ message: err.message || 'Internal server error' });
+  console.error('🔥 Error:', err.message);
+
+  res.status(err.statusCode || 500).json({
+    success: false,
+    message: err.message || 'Internal Server Error'
+  });
 });
 
-const PORT = process.env.PORT || 5000;
+// 🚀 Start Server
+const PORT = Number(process.env.PORT) || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Smart City Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
-
-module.exports = app;

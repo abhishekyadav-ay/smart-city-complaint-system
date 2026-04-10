@@ -100,6 +100,7 @@ OPENAI_API_KEY=sk-your-openai-api-key-here
 # Guide: https://support.google.com/accounts/answer/185833
 EMAIL_USER=your-email@gmail.com
 EMAIL_PASS=your-gmail-app-password
+ADMIN_EMAIL=admin-notification-email@gmail.com
 
 # Frontend origin (for CORS)
 FRONTEND_URL=http://localhost:3000
@@ -263,9 +264,11 @@ Then open:
 - **Most Frequent Issue** type
 
 ### 6. 📧 Email Notifications
-- **On Status → Resolved:** Branded HTML email with complaint details
-- **On Status → In Progress:** Simple status update email
-- Both use NodeMailer with Gmail
+- **On complaint submission:** user receives complaint received email with tracking ID
+- **On complaint submission:** admin receives new complaint alert email
+- **On every admin update:** user receives status/notes update email
+- **On Status → Resolved:** user receives branded resolution email
+- All notifications use NodeMailer with Gmail
 
 ---
 

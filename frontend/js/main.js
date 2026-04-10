@@ -7,6 +7,7 @@ const API_BASE = 'http://localhost:5000/api';
 // ── State ─────────────────────────────────
 let map;
 let selectedCategory = '';
+let detectedAICategories = [];
 
 // ── Init ──────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
@@ -131,6 +132,8 @@ function setupCategoryButtons() {
       btn.classList.add('selected');
       selectedCategory = btn.dataset.cat;
       document.getElementById('issueType').value = selectedCategory;
+      detectedAICategories = [{ issueType: selectedCategory, score: 1, priority: 1 }];
+      setAIMetadataField(detectedAICategories);
     });
   });
 }
@@ -142,6 +145,14 @@ function highlightCategory(cat) {
   });
   selectedCategory = cat;
   document.getElementById('issueType').value = cat;
+}
+
+function highlightCategories(categories) {
+  const selected = new Set(categories);
+  const catBtns = document.querySelectorAll('.cat-btn');
+  catBtns.forEach((btn) => {
+    btn.classList.toggle('selected', selected.has(btn.dataset.cat));
+  });
 }
 
 // ── Description Character Counter ─────────
@@ -191,11 +202,16 @@ function setupAIDetect() {
     aiBtn.disabled = true;
 
     try {
-      const cat = clientSideClassify(desc);
-      showAIResult(cat);
-      highlightCategory(cat);
-      document.getElementById('issueType').value = cat;
-      showToast(`✨ AI detected category: ${cat}`, 'success');
+      const detected = detectIssuePriorities(desc);
+      const primary = detected[0]?.issueType || 'Others';
+      detectedAICategories = detected;
+
+      showAIResult(detected);
+      highlightCategories(detected.map((d) => d.issueType));
+      document.getElementById('issueType').value = primary;
+      selectedCategory = primary;
+      setAIMetadataField(detectedAICategories);
+      showToast(`✨ AI detected ${detected.length} issue type(s). Primary: ${primary}`, 'success');
     } catch (err) {
       console.error('AI detection error:', err);
       showToast('AI detection failed, please select category manually', 'error');
@@ -207,32 +223,84 @@ function setupAIDetect() {
 }
 
 function clientSideClassify(text) {
-  const t = text.toLowerCase();
-  
-  // Check for each category with more keywords
-  if (/(pothole|pothole|road damage|broken road|crack|bump|ditch|pavement|asphalt|road|hole|uneven)/i.test(t)) {
-    return 'Pothole';
-  }
-  if (/(garbage|trash|waste|litter|dump|refuse|rubbish|debris|waste)|junk/i.test(t)) {
-    return 'Garbage';
-  }
-  if (/(light|lamp|street|dark|darkness|streetlight|broken light|no light|lamp post)/i.test(t)) {
-    return 'Streetlight';
-  }
-  if (/(water|leak|flood|drain|pipe|sewage|overflow|burst|wet|water supply)/i.test(t)) {
-    return 'Water Issue';
-  }
-  
-  return 'Others';
+  const detected = detectIssuePriorities(text);
+  return detected[0]?.issueType || 'Others';
 }
 
-function showAIResult(cat) {
+function detectIssuePriorities(text) {
+  const t = text.toLowerCase();
+
+  const categoryRules = [
+    {
+      issueType: 'Pothole',
+      keywords: [
+        'pothole', 'road damage', 'broken road', 'crack', 'bump', 'ditch', 'asphalt', 'uneven road'
+      ]
+    },
+    {
+      issueType: 'Garbage',
+      keywords: [
+        'garbage', 'trash', 'waste', 'litter', 'dump', 'rubbish', 'debris', 'junk'
+      ]
+    },
+    {
+      issueType: 'Streetlight',
+      keywords: [
+        'streetlight', 'street light', 'light not working', 'broken light', 'dark road', 'lamp post', 'no light'
+      ]
+    },
+    {
+      issueType: 'Water Issue',
+      keywords: [
+        'water leakage', 'water leak', 'pipeline leak', 'pipe burst', 'drain overflow', 'sewage', 'flood', 'water logging'
+      ]
+    }
+  ];
+
+  const results = [];
+
+  for (const rule of categoryRules) {
+    let score = 0;
+    for (const keyword of rule.keywords) {
+      if (t.includes(keyword)) {
+        // Multi-word phrases get higher weight than single keywords.
+        score += keyword.includes(' ') ? 3 : 1;
+      }
+    }
+    if (score > 0) {
+      results.push({ issueType: rule.issueType, score });
+    }
+  }
+
+  if (results.length === 0) {
+    return [{ issueType: 'Others', score: 1, priority: 1 }];
+  }
+
+  results.sort((a, b) => b.score - a.score);
+  return results.map((item, idx) => ({ ...item, priority: idx + 1 }));
+}
+
+function showAIResult(detected) {
   const el = document.getElementById('aiResult');
   const catEl = document.getElementById('aiCategory');
   if (!el || !catEl) return;
-  
-  catEl.textContent = cat;
+
+  catEl.innerHTML = detected
+    .map((d) => `${d.priority}. ${d.issueType} (priority score: ${d.score})`)
+    .join('<br>');
   el.style.display = 'block';
+}
+
+function setAIMetadataField(detected) {
+  let hidden = document.getElementById('aiCategories');
+  if (!hidden) {
+    hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.name = 'aiCategories';
+    hidden.id = 'aiCategories';
+    document.getElementById('complaintForm')?.appendChild(hidden);
+  }
+  hidden.value = JSON.stringify(detected || []);
 }
 
 // ── File Upload ───────────────────────────
@@ -328,17 +396,19 @@ function setupForm() {
 
       if (!res.ok) throw new Error(data.message || 'Submission failed');
 
+      const createdComplaint = data.data || data.complaint || {};
+
       // Show success
       form.style.display = 'none';
       const successEl = document.getElementById('successMsg');
       document.getElementById('successText').textContent =
-        `Your "${data.complaint?.issueType || 'issue'}" report has been received and categorized. We'll update you via email once it's resolved.`;
+        `Your "${createdComplaint.issueType || 'issue'}" report has been received and categorized. We'll update you via email once it's resolved.`;
       
       // Show tracking info
       const trackingInfo = document.getElementById('trackingInfo');
       const trackingIdDisplay = document.getElementById('trackingIdDisplay');
-      if (data.complaint?.trackingId) {
-        trackingIdDisplay.textContent = data.complaint.trackingId;
+      if (createdComplaint.trackingId) {
+        trackingIdDisplay.textContent = createdComplaint.trackingId;
         trackingInfo.style.display = 'block';
       }
       
@@ -366,6 +436,7 @@ function setupForm() {
     document.getElementById('complaintForm').style.display = 'block';
     document.getElementById('successMsg').style.display = 'none';
     document.getElementById('aiResult').style.display = 'none';
+    setAIMetadataField([]);
     document.getElementById('uploadPreview').style.display = 'none';
     document.getElementById('uploadContent').style.display = 'block';
     document.querySelectorAll('.cat-btn').forEach((b) => b.classList.remove('selected'));
@@ -399,14 +470,14 @@ async function loadComplaints() {
     
     listEl.innerHTML = '<div class="loading-spinner">Loading complaints...</div>';
     
-    // Use the new public endpoint for recent complaints
-    const res = await fetch(`${API_BASE}/complaints/public/recent?limit=9&sort=-createdAt`);
+    // Backend exposes /complaints and returns items under `data`
+    const res = await fetch(`${API_BASE}/complaints`);
     if (!res.ok) {
       throw new Error(`HTTP ${res.status}: ${res.statusText}`);
     }
     
     const data = await res.json();
-    const complaints = data.complaints || [];
+    const complaints = (data.data || data.complaints || []).slice(0, 9);
     
     console.log('Loaded complaints:', complaints);
     
@@ -540,14 +611,23 @@ function setupTracking() {
 
 async function trackComplaint(trackingId) {
   try {
-    const res = await fetch(`${API_BASE}/complaints/track/${encodeURIComponent(trackingId)}`);
+    const res = await fetch(`${API_BASE}/complaints`);
     const data = await res.json();
     
     if (!res.ok) {
       throw new Error(data.message || 'Complaint not found');
     }
-    
-    displayTrackingResult([data.complaint]);
+
+    const complaints = data.data || [];
+    const match = complaints.find(
+      (c) => String(c.trackingId || '').toUpperCase() === trackingId.toUpperCase()
+    );
+
+    if (!match) {
+      throw new Error('Complaint not found');
+    }
+
+    displayTrackingResult([match]);
   } catch (err) {
     showToast(err.message || 'Failed to track complaint', 'error');
   }
@@ -555,14 +635,22 @@ async function trackComplaint(trackingId) {
 
 async function trackComplaintsByEmail(email) {
   try {
-    const res = await fetch(`${API_BASE}/complaints/track/email/${encodeURIComponent(email)}`);
+    const res = await fetch(`${API_BASE}/complaints`);
     const data = await res.json();
     
     if (!res.ok) {
       throw new Error(data.message || 'No complaints found');
     }
-    
-    displayTrackingResult(data.complaints);
+
+    const complaints = (data.data || []).filter(
+      (c) => String(c.email || '').toLowerCase() === email.toLowerCase()
+    );
+
+    if (complaints.length === 0) {
+      throw new Error('No complaints found');
+    }
+
+    displayTrackingResult(complaints);
   } catch (err) {
     showToast(err.message || 'Failed to track complaints', 'error');
   }

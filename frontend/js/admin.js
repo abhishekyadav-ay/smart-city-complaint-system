@@ -195,7 +195,7 @@ async function loadDashboard() {
     renderCategoryPieChart('categoryChart', analytics.byCategory);
 
     // Recent table
-    renderRecentTable(complaints.complaints);
+    renderRecentTable(complaints.data || complaints.complaints || []);
   } catch (err) {
     console.error('Dashboard load error:', err);
   }
@@ -214,7 +214,7 @@ function renderRecentTable(complaints) {
         <div class="td-email">${esc(c.email)}</div>
       </td>
       <td><span class="cat-tag">${CAT_ICONS[c.issueType] || '📋'} ${esc(c.issueType)}</span></td>
-      <td style="max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${esc(c.location?.address || '—')}</td>
+      <td style="max-width:160px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${esc(c.location?.address || c.address || '—')}</td>
       <td>${statusBadge(c.status)}</td>
       <td>${formatDate(c.createdAt)}</td>
       <td><button class="action-btn" onclick="openModal('${c._id}')">View</button></td>
@@ -238,9 +238,13 @@ async function loadComplaintsTable() {
 
   try {
     const data = await apiFetch(`/complaints?${params}`);
-    totalPages = data.pagination.pages;
-    renderComplaintsTable(data.complaints);
-    renderPagination(data.pagination);
+    const complaints = data.data || data.complaints || [];
+    const pageSize = Number(params.get('limit')) || 15;
+    totalPages = Math.max(1, Math.ceil(complaints.length / pageSize));
+    const start = (currentPage - 1) * pageSize;
+    const pagedComplaints = complaints.slice(start, start + pageSize);
+    renderComplaintsTable(pagedComplaints);
+    renderPagination({ page: currentPage, pages: totalPages, total: complaints.length });
   } catch (err) {
     document.getElementById('complaintsTableBody').innerHTML =
       `<tr><td colspan="8" class="table-empty">Failed to load complaints</td></tr>`;
@@ -261,7 +265,7 @@ function renderComplaintsTable(complaints) {
       </td>
       <td style="font-size:12px; color:var(--gray-500)">${esc(c.email)}</td>
       <td><span class="cat-tag">${CAT_ICONS[c.issueType] || '📋'} ${esc(c.issueType)}</span></td>
-      <td style="max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px">${esc(c.location?.address || '—')}</td>
+      <td style="max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px">${esc(c.location?.address || c.address || '—')}</td>
       <td>${statusBadge(c.status)}</td>
       <td style="font-size:12px; color:var(--gray-500)">${formatDate(c.createdAt)}</td>
       <td>
@@ -525,7 +529,8 @@ window.openModal = async (id) => {
   document.getElementById('modalBody').innerHTML = '<p style="color:var(--gray-400);padding:20px">Loading...</p>';
 
   try {
-    const c = await apiFetch(`/complaints/${id}`);
+    const response = await apiFetch(`/complaints/${id}`);
+    const c = response.data || response;
     document.getElementById('modalTitle').textContent = `Complaint — ${c.issueType}`;
     document.getElementById('modalStatus').value = c.status;
     document.getElementById('modalNotes').value = c.adminNotes || '';
