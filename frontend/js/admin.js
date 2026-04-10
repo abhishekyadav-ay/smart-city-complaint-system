@@ -2,7 +2,13 @@
    SMART CITY — ADMIN PANEL JS
    ========================================== */
 
-const API_BASE = 'http://localhost:5000/api';
+const API_BASE =
+  window.SMART_CITY_API_BASE ||
+  localStorage.getItem('SMART_CITY_API_BASE') ||
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+    ? 'http://localhost:5000/api'
+    : '/api');
+const API_ORIGIN = API_BASE.endsWith('/api') ? API_BASE.slice(0, -4) : API_BASE;
 
 // ── State ─────────────────────────────────
 let authToken = localStorage.getItem('sc_token');
@@ -580,7 +586,7 @@ window.openModal = async (id) => {
       ` : ''}
       ${c.image ? `
         <div class="detail-label" style="margin-bottom:6px">Uploaded Image</div>
-        <img src="http://localhost:5000${c.image}" alt="Complaint image" class="modal-img" />
+        <img src="${API_ORIGIN}${c.image}" alt="Complaint image" class="modal-img" />
       ` : ''}
     `;
   } catch (err) {

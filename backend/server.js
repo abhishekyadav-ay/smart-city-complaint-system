@@ -18,8 +18,19 @@ app.use(helmet());
 // 🔥 CORS (IMPORTANT for frontend connection)
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow file:// (origin null) and same-machine development hosts on any port.
-    if (!origin || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+    const configuredOrigins = [
+      process.env.FRONTEND_URL,
+      ...(process.env.ALLOWED_ORIGINS || '')
+        .split(',')
+        .map((o) => o.trim())
+        .filter(Boolean)
+    ];
+
+    const isLocalDev = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin || '');
+    const isConfigured = configuredOrigins.includes(origin);
+
+    // Allow file:// (origin null), local dev, and configured production origins.
+    if (!origin || isLocalDev || isConfigured) {
       return callback(null, true);
     }
     return callback(new Error(`CORS blocked origin: ${origin}`));

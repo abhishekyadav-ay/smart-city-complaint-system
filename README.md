@@ -297,6 +297,43 @@ Then open:
 
 ---
 
+## 🌐 Deploy (Public Access)
+
+### Backend on Render
+- Push latest code to GitHub.
+- In Render, create **New + > Blueprint** and select this repo.
+- Render will read `render.yaml` and create `smart-city-api` from `backend/`.
+- In Render service env vars, set:
+  - `MONGO_URI`
+  - `JWT_SECRET`
+  - `EMAIL_USER` and `EMAIL_PASS` (optional)
+  - `FRONTEND_URL` (your Netlify site URL)
+  - `ALLOWED_ORIGINS` (comma-separated extra origins, optional)
+- After deploy, copy backend URL (example: `https://your-backend.onrender.com`).
+
+### Frontend on Netlify
+- In Netlify, create site from this GitHub repo.
+- Build settings:
+  - Build command: *(leave empty)*
+  - Publish directory: `frontend`
+- Edit `netlify.toml` and replace:
+  - `https://YOUR-BACKEND-URL.onrender.com` with your real Render backend URL.
+- Redeploy site.
+
+### Alternative without changing `netlify.toml`
+- In browser console on deployed frontend, run:
+  - `localStorage.setItem('SMART_CITY_API_BASE','https://your-backend.onrender.com/api')`
+  - then refresh.
+- This is useful for quick testing if proxy is not configured yet.
+
+### Verify Deployment
+- Open frontend URL from another device (same internet): should load form/dashboard.
+- Test backend directly:
+  - `https://your-backend.onrender.com/api/health`
+  - `https://your-backend.onrender.com/api/health/email`
+
+---
+
 ## 🛠️ Tech Stack
 
 | Layer | Technology |
