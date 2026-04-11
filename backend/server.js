@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
+const mongoose = require('mongoose');
 require('dotenv').config();
 const { verifyEmailConnection } = require('./utils/sendEmail');
 
@@ -56,11 +57,13 @@ app.use('/api/complaints', require('./routes/complaints'));
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/analytics', require('./routes/analytics'));
 
-// ❤️ Health Check API
+// ❤️ Health Check API (always 200 so platforms like Render mark deploy healthy; check `db` for MongoDB)
 app.get('/api/health', (req, res) => {
+  const dbReady = mongoose.connection.readyState === 1;
   res.status(200).json({
     status: 'OK',
     message: 'Server is running',
+    db: dbReady ? 'connected' : 'disconnected',
     time: new Date()
   });
 });
@@ -89,8 +92,9 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 🚀 Start Server
+// 🚀 Start Server (bind all interfaces — required for Render and similar hosts)
 const PORT = Number(process.env.PORT) || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+const HOST = process.env.HOST || '0.0.0.0';
+app.listen(PORT, HOST, () => {
+  console.log(`🚀 Server running on http://${HOST}:${PORT}`);
 });
