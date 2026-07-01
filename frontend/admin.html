@@ -23,10 +23,10 @@
       </div>
       <form id="loginForm" class="login-form">
         <div class="form-group">
-          <label class="form-label" for="loginUser">Username</label>
+          <label class="form-label" for="loginUser">Admin ID or Username</label>
           <div class="input-wrap">
-            <span class="input-icon">👤</span>
-            <input type="text" id="loginUser" class="form-input" placeholder="Enter username" required />
+            <span class="input-icon">🪪</span>
+            <input type="text" id="loginUser" class="form-input" placeholder="e.g. ADM-ABC123 or your username" required />
           </div>
         </div>
         <div class="form-group">
@@ -42,7 +42,7 @@
           <span class="btn-text">Sign In</span>
           <span class="btn-icon">→</span>
         </button>
-        <p class="login-hint">Default: admin / admin123</p>
+        <p class="login-hint">Each admin has a unique Admin ID and password. Contact super admin if you need access.</p>
       </form>
       <a href="index.html" class="back-link">← Back to Complaint Form</a>
     </div>
@@ -71,13 +71,18 @@
           <span class="link-icon">📈</span>
           <span class="link-text">Analytics</span>
         </a>
+        <a href="#" class="sidebar-link" data-tab="admins" id="adminsNavLink" style="display:none;">
+          <span class="link-icon">👥</span>
+          <span class="link-text">Manage Admins</span>
+        </a>
       </nav>
       <div class="sidebar-footer">
         <div class="admin-info">
           <span class="admin-avatar">👤</span>
           <div>
             <p class="admin-name" id="adminName">Admin</p>
-            <p class="admin-role">City Administrator</p>
+            <p class="admin-role" id="adminRole">City Administrator</p>
+            <p class="admin-id" id="adminIdDisplay" style="font-size:11px;color:rgba(255,255,255,0.55);margin-top:2px;"></p>
           </div>
         </div>
         <button class="logout-btn" id="logoutBtn" title="Logout">⬅️</button>
@@ -321,6 +326,64 @@
         <div class="section-card">
           <div class="section-card-header"><h3>Status Breakdown</h3></div>
           <div class="status-bars" id="statusBars"></div>
+        </div>
+      </div>
+
+      <!-- ===== MANAGE ADMINS TAB (super admin only) ===== -->
+      <div class="tab-content" id="tab-admins">
+        <div class="page-header">
+          <h2 class="page-title">Manage Admins</h2>
+          <p class="page-sub">Create unique Admin ID + password for each city staff member</p>
+        </div>
+
+        <div class="section-card" style="margin-bottom:20px;">
+          <div class="section-card-header"><h3>Create New Admin</h3></div>
+          <form id="createAdminForm" class="admin-create-form" style="padding:20px;">
+            <div class="form-row" style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+              <div class="form-group">
+                <label class="form-label" for="newAdminName">Full Name *</label>
+                <input type="text" id="newAdminName" class="form-input" placeholder="Rahul Sharma" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="newAdminUsername">Username *</label>
+                <input type="text" id="newAdminUsername" class="form-input" placeholder="rahul.sharma" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="newAdminEmail">Email (optional)</label>
+                <input type="email" id="newAdminEmail" class="form-input" placeholder="rahul@city.gov" />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="newAdminPassword">Password *</label>
+                <input type="password" id="newAdminPassword" class="form-input" placeholder="Min 6 characters" required minlength="6" />
+              </div>
+            </div>
+            <button type="submit" class="submit-btn" style="margin-top:12px;width:auto;padding:12px 24px;">
+              <span class="btn-text">Create Admin Account</span>
+            </button>
+          </form>
+          <div id="newAdminResult" style="display:none;padding:0 20px 20px;"></div>
+        </div>
+
+        <div class="section-card">
+          <div class="section-card-header"><h3>All Admin Accounts</h3></div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Admin ID</th>
+                  <th>Name</th>
+                  <th>Username</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="adminsTableBody">
+                <tr><td colspan="7" class="table-empty">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </main>

@@ -1,10 +1,24 @@
 const Complaint = require('../models/Complaint');
 const generateTrackingId = require('../utils/generateTrackingID');
+const { categorizeIssue } = require('../utils/aiCategorize');
 const {
   sendComplaintReceivedEmail,
+  sendAdminNewComplaintEmail,
   sendResolutionEmail,
   sendStatusUpdateEmail
 } = require('../utils/sendEmail');
+
+const sanitizePublicComplaint = (complaint) => ({
+  _id: complaint._id,
+  trackingId: complaint.trackingId,
+  name: complaint.name,
+  issueType: complaint.issueType,
+  description: complaint.description,
+  status: complaint.status,
+  address: complaint.location?.address || '',
+  adminNotes: complaint.adminNotes,
+  createdAt: complaint.createdAt
+});
 
 // CREATE
 exports.createComplaint = async (req, res, next) => {
@@ -26,8 +40,21 @@ exports.createComplaint = async (req, res, next) => {
               priority: Number(item.priority) || idx + 1
             }));
         }
-      } catch (e) {
+      } catch {
         // Ignore malformed client metadata and proceed.
+      }
+    }
+
+    let issueType = req.body.issueType;
+    let aiConfidence;
+
+    if (!issueType && req.body.description) {
+      const aiResult = await categorizeIssue(req.body.description);
+      issueType = aiResult.category;
+      aiConfidence = aiResult.confidence;
+
+      if (aiDetectedIssues.length === 0) {
+        aiDetectedIssues = [{ issueType, score: aiConfidence, priority: 1 }];
       }
     }
 
@@ -35,7 +62,7 @@ exports.createComplaint = async (req, res, next) => {
       trackingId,
       name: req.body.name,
       email: req.body.email,
-      issueType: req.body.issueType || 'Others',
+      issueType: issueType || 'Others',
       description: req.body.description,
       location: {
         address: req.body.address || '',
@@ -47,6 +74,8 @@ exports.createComplaint = async (req, res, next) => {
 
     if (aiDetectedIssues.length > 0) {
       complaintPayload.aiConfidence = aiDetectedIssues[0].score;
+    } else if (aiConfidence != null) {
+      complaintPayload.aiConfidence = aiConfidence;
     }
 
     if (req.file) {
@@ -55,9 +84,12 @@ exports.createComplaint = async (req, res, next) => {
 
     const complaint = await Complaint.create(complaintPayload);
 
-    // Notify user without blocking API response on email failure.
     sendComplaintReceivedEmail(complaint.email, complaint.name, complaint.issueType, complaint.trackingId)
       .catch(() => {});
+
+    if (process.env.ADMIN_EMAIL) {
+      sendAdminNewComplaintEmail(process.env.ADMIN_EMAIL, complaint).catch(() => {});
+    }
 
     res.status(201).json({
       success: true,
@@ -68,22 +100,97 @@ exports.createComplaint = async (req, res, next) => {
   }
 };
 
-// GET ALL
+// GET ALL (public list or admin with filters/pagination)
 exports.getComplaints = async (req, res, next) => {
   try {
-    const complaints = await Complaint.find().sort({ createdAt: -1 });
+    const isAdmin = Boolean(req.admin);
+    const { status, issueType, search } = req.query;
+    const pageNum = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const defaultLimit = isAdmin ? 20 : 9;
+    const maxLimit = isAdmin ? 100 : 20;
+    const limitNum = Math.min(maxLimit, parseInt(req.query.limit, 10) || defaultLimit);
+    const skip = (pageNum - 1) * limitNum;
+
+    const query = {};
+    if (status) query.status = status;
+    if (issueType) query.issueType = issueType;
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { 'location.address': { $regex: search, $options: 'i' } },
+        { trackingId: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    const [complaints, total] = await Promise.all([
+      Complaint.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum),
+      Complaint.countDocuments(query)
+    ]);
+
+    const data = isAdmin
+      ? complaints
+      : complaints.map((c) => sanitizePublicComplaint(c));
 
     res.json({
       success: true,
-      count: complaints.length,
-      data: complaints
+      count: data.length,
+      total,
+      page: pageNum,
+      pages: Math.max(1, Math.ceil(total / limitNum)),
+      data
     });
   } catch (err) {
     next(err);
   }
 };
 
-// GET ONE
+// TRACK BY ID (public)
+exports.trackById = async (req, res, next) => {
+  try {
+    const trackingId = String(req.params.trackingId || '').trim().toUpperCase();
+    if (!trackingId) {
+      return res.status(400).json({ success: false, message: 'Tracking ID is required' });
+    }
+
+    const complaint = await Complaint.findOne({ trackingId });
+    if (!complaint) {
+      return res.status(404).json({ success: false, message: 'Complaint not found' });
+    }
+
+    res.json({
+      success: true,
+      data: [sanitizePublicComplaint(complaint)]
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// TRACK BY EMAIL (public)
+exports.trackByEmail = async (req, res, next) => {
+  try {
+    const email = String(req.params.email || '').trim().toLowerCase();
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required' });
+    }
+
+    const complaints = await Complaint.find({ email }).sort({ createdAt: -1 });
+    if (!complaints.length) {
+      return res.status(404).json({ success: false, message: 'No complaints found' });
+    }
+
+    res.json({
+      success: true,
+      data: complaints.map((c) => sanitizePublicComplaint(c))
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// GET ONE (admin)
 exports.getComplaintById = async (req, res, next) => {
   try {
     const complaint = await Complaint.findById(req.params.id);
@@ -104,7 +211,7 @@ exports.getComplaintById = async (req, res, next) => {
   }
 };
 
-// UPDATE STATUS
+// UPDATE STATUS (admin)
 exports.updateStatus = async (req, res, next) => {
   try {
     const updatePayload = { status: req.body.status };
@@ -128,7 +235,6 @@ exports.updateStatus = async (req, res, next) => {
       });
     }
 
-    // Notify user whenever admin updates complaint status/notes.
     const notes = typeof updatePayload.adminNotes === 'string' ? updatePayload.adminNotes : complaint.adminNotes;
     if (complaint.status === 'Resolved') {
       sendResolutionEmail(
@@ -158,7 +264,7 @@ exports.updateStatus = async (req, res, next) => {
   }
 };
 
-// DELETE
+// DELETE (admin)
 exports.deleteComplaint = async (req, res, next) => {
   try {
     const complaint = await Complaint.findByIdAndDelete(req.params.id);

@@ -1095,7 +1095,6 @@ img { max-width: 100%; display: block; }
   color: var(--gray-400);
   font-size: 14px;
 }
-.action-btn.danger:hover { background: #ef4444; border-color: #ef4444; }
 
 /* Filter Bar */
 .filter-bar {
@@ -1273,7 +1272,7 @@ img { max-width: 100%; display: block; }
   display: block;
   text-align: center;
   margin-top: 20px;
-  font-size: 13px;
+  font-size: 13px; 
   color: var(--blue);
   font-weight: 500;
 }
@@ -1340,7 +1339,6 @@ img { max-width: 100%; display: block; }
 
 /* Modal Detail Rows */
 .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-.detail-item {}
 .detail-label {
   font-size: 11px;
   font-weight: 700;

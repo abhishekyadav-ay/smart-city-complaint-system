@@ -1,6 +1,28 @@
 # 🏙️ Smart City Issue Reporting & Analytics System
 
+Last updated: June 23, 2026
+
 A full-stack web application for citizens to report city issues and administrators to manage and analyze them — powered by AI categorization, interactive maps, real-time analytics, and email notifications.
+
+## Quick Local Run
+
+Run backend and frontend locally for development/testing:
+
+```bash
+# Backend
+cd backend
+npm install
+cp .env.example .env        # edit .env as needed
+npm run seed-admin          # creates initial super admin
+npm run dev                 # starts backend on http://localhost:5000
+
+# Frontend (static)
+cd ../frontend
+# Option A: open index.html in browser
+# Option B: serve with a static server
+python3 -m http.server 3000
+```
+
 
 ---
 
@@ -174,24 +196,19 @@ Then open:
 
 ---
 
-### Step 6 — Google Maps (Optional)
+### Step 6 — Maps (Leaflet + OpenStreetMap)
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com)
-2. Enable: **Maps JavaScript API** and **Places API** and **Geocoding API**
-3. Create an API key
-4. Replace `YOUR_GOOGLE_MAPS_API_KEY` in `frontend/index.html`:
+This project uses **Leaflet** with **OpenStreetMap** tiles (no API key required). The frontend also uses Nominatim for reverse geocoding when a user clicks the map — this is a free service with usage limits. If you expect high traffic, consider using a paid geocoding provider or a caching proxy.
 
-```html
-<!-- Both occurrences in the script tag near the bottom: -->
-<script>
-  const GOOGLE_MAPS_KEY = 'AIzaSy...your-key';
-</script>
-<script async defer
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSy...your-key&...">
-</script>
+No Google Maps API key is required. The interactive map is initialized in `frontend/index.html` and `frontend/js/main.js` using Leaflet and OpenStreetMap tile layers. Reverse geocoding (coordinates → address) uses the Nominatim endpoint:
+
+```
+https://nominatim.openstreetmap.org/reverse?format=json&lat=<LAT>&lon=<LON>
 ```
 
-> Without a Maps key, the address input still works (manual text entry). The map area just won't render.
+Notes:
+- For local testing nothing extra is needed — the map will render out-of-the-box.
+- For production, review OpenStreetMap/Nominatim usage policies and consider using a commercial tile/geocoding provider or hosting tile services if you need higher SLAs.
 
 ---
 
@@ -344,7 +361,7 @@ Then open:
 | AI | OpenAI GPT-3.5-turbo |
 | Email | NodeMailer (Gmail) |
 | Images | Multer (local disk) |
-| Maps | Google Maps JS API |
+| Maps | Leaflet + OpenStreetMap (Nominatim for geocoding) |
 | Charts | Chart.js v4 |
 | Frontend | Vanilla HTML/CSS/JS |
 | Fonts | DM Sans + DM Serif Display |

@@ -45,4 +45,11 @@ const complaintSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+complaintSchema.virtual('address').get(function () {
+  return this.location?.address || '';
+});
+
+complaintSchema.set('toJSON', { virtuals: true });
+complaintSchema.set('toObject', { virtuals: true });
+
 module.exports = mongoose.model('Complaint', complaintSchema);

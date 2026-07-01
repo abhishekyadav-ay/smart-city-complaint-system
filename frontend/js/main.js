@@ -2,12 +2,19 @@
    SMART CITY — PUBLIC COMPLAINT FORM JS
    ========================================== */
 
-const API_BASE =
-  window.SMART_CITY_API_BASE ||
-  localStorage.getItem('SMART_CITY_API_BASE') ||
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:5000/api'
-    : '/api');
+// Resolve API base with safe fallbacks for local file, local server, or deployed hosting.
+const API_BASE = (() => {
+  const configured = window.SMART_CITY_API_BASE || localStorage.getItem('SMART_CITY_API_BASE');
+  if (configured) {
+    return configured.replace(/\/$/, '');
+  }
+
+  if (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:5000/api';
+  }
+
+  return '/api';
+})();
 
 // ── State ─────────────────────────────────
 let map;
@@ -25,65 +32,47 @@ document.addEventListener('DOMContentLoaded', () => {
   setupAIDetect();
   setupTracking();
 
-  // Locate Me
   document.getElementById('locateBtn')?.addEventListener('click', getUserLocation);
 });
 
-// ── Leaflet Map Initialization ────────────
-// Map is initialized in HTML, this waits for it
+// ── Leaflet Map ───────────────────────────
 function initLeafletMap() {
   if (typeof L === 'undefined' || !document.getElementById('map')) {
-    console.warn('Leaflet map not ready yet');
     return;
   }
 
-  // Get map reference (created in HTML)
   map = window.currentMap || document.getElementById('map')._leaflet_map;
-  
-  // If map still not available, create it
+
   if (!map || !map.on) {
-    // Re-initialize the map
     map = L.map('map', { preferCanvas: true }).setView([28.6139, 77.209], 13);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
+    window.currentMap = map;
   }
 
-  // Add click handler to set location
   if (!map._complaintMapListener) {
-    map.on('click', function(e) {
+    map.on('click', (e) => {
       const lat = e.latlng.lat.toFixed(6);
       const lng = e.latlng.lng.toFixed(6);
       document.getElementById('lat').value = lat;
       document.getElementById('lng').value = lng;
-      document.getElementById('address').value = `${lat}, ${lng}`;
-      
-      // Add/update marker
-      if (window.currentMarker) {
-        map.removeLayer(window.currentMarker);
-      }
-      window.currentMarker = L.marker([lat, lng]).addTo(map);
+      moveMarker(lat, lng);
       reverseGeocode(lat, lng);
     });
     map._complaintMapListener = true;
   }
 }
 
-// Initialize map when DOM is ready
 setTimeout(() => {
-  if (typeof L !== 'undefined') {
-    initLeafletMap();
-  }
-}, 500);
+  if (typeof L !== 'undefined') initLeafletMap();
+}, 300);
 
-// ── Map Helpers ───────────────────────────
 function moveMarker(lat, lng) {
   if (!map) return;
   document.getElementById('lat').value = lat;
   document.getElementById('lng').value = lng;
-  document.getElementById('address').value = `${lat}, ${lng}`;
-  
-  // Add/update marker on map
+
   if (window.currentMarker) {
     map.removeLayer(window.currentMarker);
   }
@@ -92,15 +81,14 @@ function moveMarker(lat, lng) {
 }
 
 function reverseGeocode(lat, lng) {
-  // Use Nominatim (OpenStreetMap) for free reverse geocoding
   fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
-    .then(response => response.json())
-    .then(data => {
-      if (data && data.display_name) {
+    .then((response) => response.json())
+    .then((data) => {
+      if (data?.display_name) {
         document.getElementById('address').value = data.display_name;
       }
     })
-    .catch(err => console.log('Geocoding failed:', err));
+    .catch(() => {});
 }
 
 function getUserLocation() {
@@ -108,16 +96,15 @@ function getUserLocation() {
     showToast('Geolocation is not supported by your browser', 'error');
     return;
   }
+
   const btn = document.getElementById('locateBtn');
   btn.style.opacity = '0.5';
+
   navigator.geolocation.getCurrentPosition(
     (pos) => {
       const { latitude, longitude } = pos.coords;
-      moveMarker(latitude, longitude);
+      moveMarker(latitude.toFixed(6), longitude.toFixed(6));
       reverseGeocode(latitude, longitude);
-      if (map) {
-        map.setView([latitude, longitude], 16);
-      }
       btn.style.opacity = '1';
       showToast('✅ Location detected!', 'success');
     },
@@ -616,23 +603,14 @@ function setupTracking() {
 
 async function trackComplaint(trackingId) {
   try {
-    const res = await fetch(`${API_BASE}/complaints`);
+    const res = await fetch(`${API_BASE}/complaints/track/${encodeURIComponent(trackingId)}`);
     const data = await res.json();
-    
+
     if (!res.ok) {
       throw new Error(data.message || 'Complaint not found');
     }
 
-    const complaints = data.data || [];
-    const match = complaints.find(
-      (c) => String(c.trackingId || '').toUpperCase() === trackingId.toUpperCase()
-    );
-
-    if (!match) {
-      throw new Error('Complaint not found');
-    }
-
-    displayTrackingResult([match]);
+    displayTrackingResult(data.data || []);
   } catch (err) {
     showToast(err.message || 'Failed to track complaint', 'error');
   }
@@ -640,22 +618,14 @@ async function trackComplaint(trackingId) {
 
 async function trackComplaintsByEmail(email) {
   try {
-    const res = await fetch(`${API_BASE}/complaints`);
+    const res = await fetch(`${API_BASE}/complaints/track/email/${encodeURIComponent(email)}`);
     const data = await res.json();
-    
+
     if (!res.ok) {
       throw new Error(data.message || 'No complaints found');
     }
 
-    const complaints = (data.data || []).filter(
-      (c) => String(c.email || '').toLowerCase() === email.toLowerCase()
-    );
-
-    if (complaints.length === 0) {
-      throw new Error('No complaints found');
-    }
-
-    displayTrackingResult(complaints);
+    displayTrackingResult(data.data || []);
   } catch (err) {
     showToast(err.message || 'Failed to track complaints', 'error');
   }

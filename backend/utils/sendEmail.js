@@ -1,21 +1,40 @@
 const nodemailer = require('nodemailer');
 
 const createTransporter = () => {
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-  });
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS;
+  const host = process.env.EMAIL_SMTP_HOST;
+  const port = Number(process.env.EMAIL_SMTP_PORT) || 465;
+  const secure = process.env.EMAIL_SMTP_SECURE !== 'false';
+
+  if (host && user && pass) {
+    return nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: { user, pass },
+    });
+  }
+
+  if (user && pass) {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: { user, pass },
+    });
+  }
+
+  throw new Error('Email credentials are not configured correctly. Provide EMAIL_USER and EMAIL_PASS, or EMAIL_SMTP_HOST with credentials.');
 };
 
 const canSendEmail = () => {
   const user = process.env.EMAIL_USER || '';
   const pass = process.env.EMAIL_PASS || '';
+  const host = process.env.EMAIL_SMTP_HOST || '';
   if (!user || !pass) return false;
-  // Prevent silent confusion when placeholder values are still present.
   if (user.includes('your-email@gmail.com') || pass.includes('your-gmail-app-password')) {
+    return false;
+  }
+  if (!host && !process.env.EMAIL_USER) {
     return false;
   }
   return true;
@@ -54,6 +73,11 @@ const verifyEmailConnection = async () => {
 };
 
 const sendMail = async ({ to, subject, html }) => {
+  if (!to) {
+    console.log('⚠️  Email skipped because recipient address is empty.');
+    return false;
+  }
+
   if (!canSendEmail()) {
     console.log('⚠️  Email credentials not configured. Skipping email notification.');
     return false;
@@ -65,7 +89,7 @@ const sendMail = async ({ to, subject, html }) => {
       from: `"Smart City Portal" <${process.env.EMAIL_USER}>`,
       to,
       subject,
-      html
+      html,
     });
     console.log(`📧 Email sent to ${to} — Message ID: ${info.messageId}`);
     return true;

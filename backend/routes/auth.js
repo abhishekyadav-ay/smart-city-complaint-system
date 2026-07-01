@@ -1,15 +1,24 @@
 const express = require('express');
 const router = express.Router();
-const { login, createAdmin, verifyToken } = require('../controllers/authController');
+const {
+  login,
+  createAdmin,
+  verifyToken,
+  listAdmins,
+  createStaffAdmin,
+  resetAdminPassword,
+  toggleAdminStatus,
+} = require('../controllers/authController');
 const auth = require('../middleware/auth');
+const superAdmin = require('../middleware/superAdmin');
 
-// POST /api/auth/login
 router.post('/login', login);
-
-// POST /api/auth/register (protected by secret key in body)
 router.post('/register', createAdmin);
-
-// GET /api/auth/verify (JWT protected)
 router.get('/verify', auth, verifyToken);
+
+router.get('/admins', auth, superAdmin, listAdmins);
+router.post('/admins', auth, superAdmin, createStaffAdmin);
+router.put('/admins/:id/password', auth, superAdmin, resetAdminPassword);
+router.patch('/admins/:id/status', auth, superAdmin, toggleAdminStatus);
 
 module.exports = router;

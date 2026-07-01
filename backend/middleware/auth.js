@@ -1,6 +1,4 @@
 const jwt = require('jsonwebtoken');
-const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 const authMiddleware = (req, res, next) => {
   const authHeader = req.header('Authorization');
@@ -9,7 +7,10 @@ const authMiddleware = (req, res, next) => {
   }
 
   const token = authHeader.replace('Bearer ', '').trim();
-  const secret = process.env.JWT_SECRET || 'smart-city-default-jwt-secret-key';
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    return res.status(500).json({ message: 'Server misconfiguration: JWT_SECRET is missing.' });
+  }
 
   try {
     const decoded = jwt.verify(token, secret);

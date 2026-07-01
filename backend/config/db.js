@@ -3,25 +3,20 @@ const mongoose = require('mongoose');
 let connectAttempt = 0;
 
 const connectDB = async () => {
-  const uri = process.env.MONGO_URI;
-  if (!uri || !uri.trim()) {
-    connectAttempt += 1;
-    const delayMs = Math.min(30000, 2000 * connectAttempt);
-    console.error(
-      `MONGO_URI is not set. Retrying MongoDB connection in ${delayMs / 1000}s (attempt ${connectAttempt}).`
-    );
-    setTimeout(() => {
-      connectDB();
-    }, delayMs);
-    return;
+  const uri = process.env.MONGO_URI?.trim();
+  if (!uri) {
+    console.error('MONGO_URI is required. Please configure your MongoDB Atlas URI in environment variables.');
+    process.exit(1);
   }
 
   try {
     mongoose.set('strictQuery', true);
     await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 10000
+      serverSelectionTimeoutMS: 10000,
+      maxPoolSize: 10,
     });
-    console.log('MongoDB Connected');
+    const safeUri = uri.replace(/(\/\/.*:)(.*)(@)/, '$1***$3');
+    console.log(`MongoDB Connected to ${safeUri}`);
   } catch (err) {
     connectAttempt += 1;
     const delayMs = Math.min(30000, 2000 * connectAttempt);

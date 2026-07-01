@@ -306,23 +306,18 @@
   <!-- Toast Notification -->
   <div class="toast" id="toast"></div>
 
-  <!-- Leaflet Maps (free alternative to Google Maps) -->
+  <!-- Leaflet Maps (free — no API key or billing required) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script>
-    // Initialize map when Leaflet is loaded
-    let mapReady = false;
-    document.addEventListener('DOMContentLoaded', function() {
-      if (typeof L !== 'undefined' && document.getElementById('map')) {
-        const map = L.map('map').setView([28.6139, 77.209], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        }).addTo(map);
-        window.currentMap = map;
-        mapReady = true;
-        // Trigger map listener setup in main.js
-        if (window.initLeafletMap) initLeafletMap();
-      }
+    document.addEventListener('DOMContentLoaded', () => {
+      if (typeof L === 'undefined' || !document.getElementById('map')) return;
+      const map = L.map('map').setView([28.6139, 77.209], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      }).addTo(map);
+      window.currentMap = map;
+      if (window.initLeafletMap) initLeafletMap();
     });
   </script>
   <script src="js/main.js"></script>

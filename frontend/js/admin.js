@@ -2,16 +2,30 @@
    SMART CITY — ADMIN PANEL JS
    ========================================== */
 
-const API_BASE =
-  window.SMART_CITY_API_BASE ||
-  localStorage.getItem('SMART_CITY_API_BASE') ||
-  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:5000/api'
-    : '/api');
-const API_ORIGIN = API_BASE.endsWith('/api') ? API_BASE.slice(0, -4) : API_BASE;
+// Resolve API base with fallbacks useful for local dev (file:// or localhost) and deployed environments.
+const API_BASE = (() => {
+  const configured = window.SMART_CITY_API_BASE || localStorage.getItem('SMART_CITY_API_BASE');
+  if (configured) {
+    return configured.replace(/\/$/, '');
+  }
+
+  if (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    return 'http://localhost:5000/api';
+  }
+
+  return '/api';
+})();
+
+const API_ORIGIN = (() => {
+  if (API_BASE.startsWith('http')) {
+    return API_BASE.endsWith('/api') ? API_BASE.slice(0, -4) : API_BASE;
+  }
+  return window.location.origin;
+})();
 
 // ── State ─────────────────────────────────
 let authToken = localStorage.getItem('sc_token');
+let currentAdmin = null;
 let currentPage = 1;
 let totalPages = 1;
 let charts = {};
@@ -42,6 +56,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setupModals();
   setupRefresh();
   setupFilters();
+  setupAdminManagement();
 });
 
 // ── Auth ──────────────────────────────────
@@ -50,25 +65,41 @@ function showLogin() {
   document.getElementById('adminLayout').style.display = 'none';
 }
 
-function showAdmin(username) {
+function showAdmin(admin) {
+  currentAdmin = admin || {};
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('adminLayout').style.display = 'flex';
-  document.getElementById('adminName').textContent = username || 'Admin';
+  document.getElementById('adminName').textContent = currentAdmin.name || currentAdmin.username || 'Admin';
+  document.getElementById('adminRole').textContent =
+    currentAdmin.role === 'super' ? 'Super Administrator' : 'City Administrator';
+  document.getElementById('adminIdDisplay').textContent = currentAdmin.adminId
+    ? `ID: ${currentAdmin.adminId}`
+    : '';
+
+  const adminsNav = document.getElementById('adminsNavLink');
+  if (adminsNav) {
+    adminsNav.style.display = currentAdmin.role === 'super' ? 'flex' : 'none';
+  }
+
   loadDashboard();
   loadComplaintsTable();
   loadAnalytics();
+  if (currentAdmin.role === 'super') {
+    loadAdminsTable();
+  }
 }
 
 async function verifyAndBoot() {
   try {
     const res = await apiFetch('/auth/verify');
     if (res.valid) {
-      showAdmin(res.admin?.username);
+      showAdmin(res.admin);
     } else {
       throw new Error('Invalid');
     }
   } catch {
     authToken = null;
+    currentAdmin = null;
     localStorage.removeItem('sc_token');
     showLogin();
   }
@@ -87,7 +118,7 @@ function setupLoginForm() {
 
   form?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const username = document.getElementById('loginUser').value.trim();
+    const loginId = document.getElementById('loginUser').value.trim();
     const password = document.getElementById('loginPass').value;
     const errEl = document.getElementById('loginError');
     const btn = document.getElementById('loginBtn');
@@ -100,7 +131,7 @@ function setupLoginForm() {
       const res = await fetch(`${API_BASE}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ loginId, password }),
       });
       const data = await res.json();
 
@@ -108,7 +139,7 @@ function setupLoginForm() {
 
       authToken = data.token;
       localStorage.setItem('sc_token', authToken);
-      showAdmin(data.username);
+      showAdmin(data.admin || { username: data.username });
     } catch (err) {
       errEl.textContent = err.message;
       errEl.style.display = 'block';
@@ -120,6 +151,7 @@ function setupLoginForm() {
 
   document.getElementById('logoutBtn')?.addEventListener('click', () => {
     authToken = null;
+    currentAdmin = null;
     localStorage.removeItem('sc_token');
     showLogin();
     showToast('Logged out successfully');
@@ -168,8 +200,17 @@ function switchTab(tab) {
   document.querySelectorAll('.sidebar-link').forEach((el) => el.classList.remove('active'));
   document.getElementById(`tab-${tab}`)?.classList.add('active');
   document.querySelector(`[data-tab="${tab}"]`)?.classList.add('active');
-  document.getElementById('topbarTitle').textContent =
-    tab.charAt(0).toUpperCase() + tab.slice(1);
+  const titles = {
+    dashboard: 'Dashboard',
+    complaints: 'Complaints',
+    analytics: 'Analytics',
+    admins: 'Manage Admins',
+  };
+  document.getElementById('topbarTitle').textContent = titles[tab] || tab;
+
+  if (tab === 'admins' && currentAdmin?.role === 'super') {
+    loadAdminsTable();
+  }
 }
 
 // ── Dashboard ─────────────────────────────
@@ -245,12 +286,9 @@ async function loadComplaintsTable() {
   try {
     const data = await apiFetch(`/complaints?${params}`);
     const complaints = data.data || data.complaints || [];
-    const pageSize = Number(params.get('limit')) || 15;
-    totalPages = Math.max(1, Math.ceil(complaints.length / pageSize));
-    const start = (currentPage - 1) * pageSize;
-    const pagedComplaints = complaints.slice(start, start + pageSize);
-    renderComplaintsTable(pagedComplaints);
-    renderPagination({ page: currentPage, pages: totalPages, total: complaints.length });
+    totalPages = data.pages || 1;
+    renderComplaintsTable(complaints);
+    renderPagination({ page: data.page || currentPage, pages: totalPages, total: data.total || complaints.length });
   } catch (err) {
     document.getElementById('complaintsTableBody').innerHTML =
       `<tr><td colspan="8" class="table-empty">Failed to load complaints</td></tr>`;
@@ -636,6 +674,119 @@ window.deleteComplaint = async (id) => {
     loadDashboard();
     loadComplaintsTable();
     loadAnalytics();
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+// ── Admin Management (super admin) ────────
+function setupAdminManagement() {
+  document.getElementById('createAdminForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (currentAdmin?.role !== 'super') {
+      showToast('Super admin access required', 'error');
+      return;
+    }
+
+    const name = document.getElementById('newAdminName').value.trim();
+    const username = document.getElementById('newAdminUsername').value.trim();
+    const email = document.getElementById('newAdminEmail').value.trim();
+    const password = document.getElementById('newAdminPassword').value;
+
+    try {
+      const data = await apiFetch('/auth/admins', {
+        method: 'POST',
+        body: JSON.stringify({ name, username, email, password }),
+      });
+
+      const resultEl = document.getElementById('newAdminResult');
+      resultEl.style.display = 'block';
+      resultEl.innerHTML = `
+        <div style="background:#ecfdf5;border:1px solid #86efac;border-radius:10px;padding:16px;">
+          <strong>Admin created successfully</strong>
+          <p style="margin:8px 0 0;font-size:14px;">Share these credentials securely with <strong>${esc(data.admin.name)}</strong>:</p>
+          <ul style="margin:10px 0 0;font-size:14px;line-height:1.8;">
+            <li><strong>Admin ID:</strong> <code>${esc(data.admin.adminId)}</code></li>
+            <li><strong>Username:</strong> <code>${esc(data.admin.username)}</code></li>
+            <li><strong>Password:</strong> (the one you just set)</li>
+          </ul>
+        </div>
+      `;
+
+      document.getElementById('createAdminForm').reset();
+      loadAdminsTable();
+      showToast('New admin account created', 'success');
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+}
+
+async function loadAdminsTable() {
+  const tbody = document.getElementById('adminsTableBody');
+  if (!tbody || currentAdmin?.role !== 'super') return;
+
+  try {
+    const data = await apiFetch('/auth/admins');
+    const admins = data.data || [];
+
+    if (!admins.length) {
+      tbody.innerHTML = `<tr><td colspan="7" class="table-empty">No admin accounts yet</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = admins.map((admin) => `
+      <tr>
+        <td style="font-family:monospace;font-weight:700;">${esc(admin.adminId)}</td>
+        <td>${esc(admin.name || '—')}</td>
+        <td>${esc(admin.username)}</td>
+        <td style="font-size:12px;">${esc(admin.email || '—')}</td>
+        <td>${admin.role === 'super' ? 'Super Admin' : 'Admin'}</td>
+        <td>${admin.isActive ? '<span class="status-badge badge-resolved">Active</span>' : '<span class="status-badge badge-pending">Inactive</span>'}</td>
+        <td>
+          ${admin.role === 'super' ? '—' : `
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">
+              <button class="action-btn" onclick="resetAdminPassword('${admin._id}', '${esc(admin.adminId)}')">Reset Pass</button>
+              <button class="action-btn ${admin.isActive ? 'danger' : ''}" onclick="toggleAdminActive('${admin._id}', ${!admin.isActive})">
+                ${admin.isActive ? 'Deactivate' : 'Activate'}
+              </button>
+            </div>
+          `}
+        </td>
+      </tr>
+    `).join('');
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" class="table-empty">${esc(err.message)}</td></tr>`;
+  }
+}
+
+window.resetAdminPassword = async (id, adminId) => {
+  const password = prompt(`Enter new password for admin ${adminId} (min 6 characters):`);
+  if (!password) return;
+  if (password.length < 6) {
+    showToast('Password must be at least 6 characters', 'error');
+    return;
+  }
+
+  try {
+    await apiFetch(`/auth/admins/${id}/password`, {
+      method: 'PUT',
+      body: JSON.stringify({ password }),
+    });
+    showToast('Password updated', 'success');
+  } catch (err) {
+    showToast(err.message, 'error');
+  }
+};
+
+window.toggleAdminActive = async (id, isActive) => {
+  try {
+    await apiFetch(`/auth/admins/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isActive }),
+    });
+    loadAdminsTable();
+    showToast(isActive ? 'Admin activated' : 'Admin deactivated', 'success');
   } catch (err) {
     showToast(err.message, 'error');
   }
