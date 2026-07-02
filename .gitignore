@@ -62,6 +62,7 @@ Thumbs.db
 
 # Uploads (user uploaded files)
 backend/uploads/*
+!backend/uploads/.gitkeep
 
 # Database files (if using local SQLite)
 *.db

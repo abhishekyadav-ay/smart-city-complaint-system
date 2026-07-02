@@ -1,259 +1,70 @@
-# 🏙️ Smart City Issue Reporting & Analytics System
+# Smart City Complaint System
 
-Last updated: June 23, 2026
+A simple full-stack app for citizens to report city issues and for admins to manage, track, and analyze complaints.
 
-A full-stack web application for citizens to report city issues and administrators to manage and analyze them — powered by AI categorization, interactive maps, real-time analytics, and email notifications.
+## What this project does
+- Public complaint form with image upload and location capture
+- Admin dashboard to review and update complaints
+- Basic analytics for issue trends and status summary
+- Optional AI-based categorization with a keyword-based fallback
 
-## Quick Local Run
+## Tech stack
+- Backend: Node.js + Express + MongoDB + Mongoose
+- Frontend: Plain HTML, CSS, and JavaScript
+- Auth: JWT for admin access
+- File uploads: Multer
 
-Run backend and frontend locally for development/testing:
-
-```bash
-# Backend
-cd backend
-npm install
-cp .env.example .env        # edit .env as needed
-npm run seed-admin          # creates initial super admin
-npm run dev                 # starts backend on http://localhost:5000
-
-# Frontend (static)
-cd ../frontend
-# Option A: open index.html in browser
-# Option B: serve with a static server
-python3 -m http.server 3000
-```
-
-
----
-
-## 📁 Project Structure
-
-```
+## Project structure
+```text
 smart-city/
-├── backend/
-│   ├── config/
-│   │   └── db.js                  # MongoDB connection
-│   ├── controllers/
-│   │   ├── authController.js      # Admin login/register
-│   │   ├── complaintController.js # CRUD for complaints
-│   │   └── analyticsController.js # Analytics aggregation
-│   ├── middleware/
-│   │   ├── auth.js                # JWT verification
-│   │   └── upload.js              # Multer image upload
-│   ├── models/
-│   │   ├── Admin.js               # Admin schema (bcrypt password)
-│   │   └── Complaint.js           # Complaint schema
-│   ├── routes/
-│   │   ├── auth.js
-│   │   ├── complaints.js
-│   │   └── analytics.js
-│   ├── scripts/
-│   │   └── seedAdmin.js           # Seed default admin account
-│   ├── utils/
-│   │   ├── aiCategorize.js        # OpenAI + keyword classifier
-│   │   └── sendEmail.js           # NodeMailer email service
-│   ├── uploads/                   # Uploaded images (auto-created)
-│   ├── .env.example               # Environment variable template
-│   ├── package.json
-│   └── server.js                  # Express entry point
-│
-└── frontend/
-    ├── css/
-    │   └── style.css              # Full design system
-    ├── js/
-    │   ├── main.js                # Complaint form logic + Maps
-    │   └── admin.js               # Admin dashboard + Charts
-    ├── index.html                 # Public complaint form
-    └── admin.html                 # Admin portal
+├── backend/         # Express API, MongoDB models, auth, routes
+├── frontend/        # Public and admin pages
+├── render.yaml       # Render deployment config
+├── netlify.toml     # Netlify config
+└── README.md        # Project overview
 ```
 
----
+## Quick start
 
-## 🚀 Quick Start
-
-### Prerequisites
-- **Node.js** v18+ — https://nodejs.org
-- **MongoDB** v6+ (local or Atlas) — https://mongodb.com
-- **npm** or **yarn**
-
----
-
-### Step 1 — Clone or Download
-
-```bash
-# If using git:
-git clone <repo-url>
-cd smart-city
-```
-
----
-
-### Step 2 — Backend Setup
-
+### 1) Backend setup
 ```bash
 cd backend
 npm install
-```
-
-**Create your `.env` file:**
-
-```bash
 cp .env.example .env
 ```
 
-Edit `.env` with your values:
+Update the values in `.env` for your MongoDB connection, JWT secret, and optional email/OpenAI settings.
 
-```env
-# Server
-PORT=5000
-
-# MongoDB — local or MongoDB Atlas
-MONGO_URI=mongodb://localhost:27017/smart-city
-
-# JWT secret (any long random string)
-JWT_SECRET=change-me-to-a-very-long-random-secret
-
-# OpenAI (for AI categorization)
-# Get key at: https://platform.openai.com/api-keys
-# Leave as-is to use keyword-based fallback classifier
-OPENAI_API_KEY=sk-your-openai-api-key-here
-
-# Email — Gmail with App Password
-# Guide: https://support.google.com/accounts/answer/185833
-EMAIL_USER=your-email@gmail.com
-EMAIL_PASS=your-gmail-app-password
-ADMIN_EMAIL=admin-notification-email@gmail.com
-
-# Frontend origin (for CORS)
-FRONTEND_URL=http://localhost:3000
-
-# Default admin credentials for seeding
-DEFAULT_ADMIN_USER=admin
-DEFAULT_ADMIN_PASS=admin123
-```
-
-> **Note:** If you don't have an OpenAI key, the system automatically falls back to a keyword-based classifier. If you don't configure email, resolution notifications are silently skipped. Both features degrade gracefully.
-
----
-
-### Step 3 — Seed the Admin Account
-
+### 2) Seed the admin account
 ```bash
 npm run seed-admin
 ```
 
-Output:
-```
-✅ Admin created — Username: admin | Password: admin123
-```
-
----
-
-### Step 4 — Start the Backend
-
+### 3) Start the backend
 ```bash
-# Development (auto-restart on changes):
 npm run dev
-
-# Production:
-npm start
 ```
 
-Output:
-```
-✅ MongoDB Connected: localhost
-🚀 Smart City Server running on http://localhost:5000
-```
+The API will run at http://localhost:5000.
 
----
-
-### Step 5 — Frontend Setup
-
-The frontend is **plain HTML/CSS/JS** — no build step needed.
-
-**Option A: Open directly in browser**
+### 4) Serve the frontend
 ```bash
-# Just open in your browser:
-open frontend/index.html
-open frontend/admin.html
+cd ../frontend
+python -m http.server 3000
 ```
 
-**Option B: Serve with a local server (recommended for Maps + API calls)**
-```bash
-# Using Python
-cd frontend
-python3 -m http.server 3000
+Open http://localhost:3000 for the public form and http://localhost:3000/admin.html for the admin portal.
 
-# Or using Node.js live-server
-npx live-server frontend --port=3000
+## API highlights
+- `GET /api/health` — health check
+- `POST /api/complaints` — submit a complaint
+- `GET /api/complaints` — list complaints for admins
+- `POST /api/auth/login` — admin login
 
-# Or using VS Code Live Server extension
-```
-
-Then open:
-- **Complaint Form:** http://localhost:3000
-- **Admin Portal:** http://localhost:3000/admin.html
-
----
-
-### Step 6 — Maps (Leaflet + OpenStreetMap)
-
-This project uses **Leaflet** with **OpenStreetMap** tiles (no API key required). The frontend also uses Nominatim for reverse geocoding when a user clicks the map — this is a free service with usage limits. If you expect high traffic, consider using a paid geocoding provider or a caching proxy.
-
-No Google Maps API key is required. The interactive map is initialized in `frontend/index.html` and `frontend/js/main.js` using Leaflet and OpenStreetMap tile layers. Reverse geocoding (coordinates → address) uses the Nominatim endpoint:
-
-```
-https://nominatim.openstreetmap.org/reverse?format=json&lat=<LAT>&lon=<LON>
-```
-
-Notes:
-- For local testing nothing extra is needed — the map will render out-of-the-box.
-- For production, review OpenStreetMap/Nominatim usage policies and consider using a commercial tile/geocoding provider or hosting tile services if you need higher SLAs.
-
----
-
-## 🔑 API Reference
-
-### Public Routes
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/complaints` | Submit new complaint (multipart/form-data) |
-| GET | `/api/health` | Health check |
-
-### Admin Routes (require `Authorization: Bearer <token>`)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/auth/login` | Admin login → returns JWT |
-| GET | `/api/auth/verify` | Verify JWT validity |
-| GET | `/api/complaints` | List complaints (filter, paginate) |
-| GET | `/api/complaints/:id` | Get single complaint |
-| PUT | `/api/complaints/:id/status` | Update status + notes |
-| DELETE | `/api/complaints/:id` | Delete complaint |
-| GET | `/api/analytics` | Full analytics data |
-
-### Query Parameters for `GET /api/complaints`
-
-| Param | Values | Description |
-|-------|--------|-------------|
-| status | Pending, In Progress, Resolved | Filter by status |
-| issueType | Pothole, Garbage, Streetlight, Water Issue, Others | Filter by category |
-| search | string | Search name, description, location |
-| page | number | Page number (default: 1) |
-| limit | number | Items per page (default: 20) |
-
----
-
-## ✨ Features
-
-### 1. 🧑‍💼 Citizen Side
-- **Complaint Form** with real-time validation
-- **Google Maps** integration — click to place pin, autocomplete addresses, GPS geolocation
-- **AI Category Auto-Detection** — click "AI Detect" for instant preview (full AI runs on submission)
-- **Manual Category Override** — visual category picker
-- **Image Upload** — drag & drop or browse, 5MB limit, preview before submit
-- **Character Counter** on description field
+## Notes
+- The frontend is intentionally kept simple with no build step.
+- If OpenAI credentials are not configured, the app falls back to a keyword-based classifier.
+- Uploaded images are stored locally in the backend uploads folder during development.
 
 ### 2. 🤖 AI Categorization
 - **OpenAI GPT-3.5** categorizes complaints into: Pothole, Garbage, Streetlight, Water Issue, Others
