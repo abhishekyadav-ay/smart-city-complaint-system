@@ -72,3 +72,7 @@ backend/uploads/*
 # Build outputs
 dist/
 build/
+
+backend/node_modules/
+backend/.env
+backend/uploads/
