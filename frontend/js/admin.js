@@ -9,7 +9,10 @@ const API_BASE = (() => {
     return configured.replace(/\/$/, '');
   }
 
-  if (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  const host = (window.location.hostname || '').replace(/^\[|\]$/g, '');
+  const isLocalHost = ['localhost', '127.0.0.1', '::1', '0.0.0.0'].includes(host);
+
+  if (window.location.protocol === 'file:' || isLocalHost) {
     return 'http://localhost:5000/api';
   }
 

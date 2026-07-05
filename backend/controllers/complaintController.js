@@ -5,7 +5,7 @@ const {
   sendComplaintReceivedEmail,
   sendAdminNewComplaintEmail,
   sendResolutionEmail,
-  sendStatusUpdateEmail
+  sendStatusUpdateEmail,
 } = require('../utils/sendEmail');
 
 const sanitizePublicComplaint = (complaint) => ({
@@ -17,34 +17,39 @@ const sanitizePublicComplaint = (complaint) => ({
   status: complaint.status,
   address: complaint.location?.address || '',
   adminNotes: complaint.adminNotes,
-  createdAt: complaint.createdAt
+  createdAt: complaint.createdAt,
 });
 
-// CREATE
+const parseAiCategories = (rawValue) => {
+  if (!rawValue) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed
+      .filter((item) => item && item.issueType)
+      .map((item, index) => ({
+        issueType: item.issueType,
+        score: Number(item.score) || 0,
+        priority: Number(item.priority) || index + 1,
+      }));
+  } catch {
+    return [];
+  }
+};
+
 exports.createComplaint = async (req, res, next) => {
   try {
     const trackingId = generateTrackingId();
     const lat = req.body.lat !== undefined && req.body.lat !== '' ? Number(req.body.lat) : undefined;
     const lng = req.body.lng !== undefined && req.body.lng !== '' ? Number(req.body.lng) : undefined;
 
-    let aiDetectedIssues = [];
-    if (req.body.aiCategories) {
-      try {
-        const parsed = JSON.parse(req.body.aiCategories);
-        if (Array.isArray(parsed)) {
-          aiDetectedIssues = parsed
-            .filter((item) => item && item.issueType)
-            .map((item, idx) => ({
-              issueType: item.issueType,
-              score: Number(item.score) || 0,
-              priority: Number(item.priority) || idx + 1
-            }));
-        }
-      } catch {
-        // Ignore malformed client metadata and proceed.
-      }
-    }
-
+    let aiDetectedIssues = parseAiCategories(req.body.aiCategories);
     let issueType = req.body.issueType;
     let aiConfidence;
 
@@ -67,9 +72,9 @@ exports.createComplaint = async (req, res, next) => {
       location: {
         address: req.body.address || '',
         lat: Number.isFinite(lat) ? lat : undefined,
-        lng: Number.isFinite(lng) ? lng : undefined
+        lng: Number.isFinite(lng) ? lng : undefined,
       },
-      aiDetectedIssues
+      aiDetectedIssues,
     };
 
     if (aiDetectedIssues.length > 0) {
@@ -84,23 +89,18 @@ exports.createComplaint = async (req, res, next) => {
 
     const complaint = await Complaint.create(complaintPayload);
 
-    sendComplaintReceivedEmail(complaint.email, complaint.name, complaint.issueType, complaint.trackingId)
-      .catch(() => {});
+    sendComplaintReceivedEmail(complaint.email, complaint.name, complaint.issueType, complaint.trackingId).catch(() => {});
 
     if (process.env.ADMIN_EMAIL) {
       sendAdminNewComplaintEmail(process.env.ADMIN_EMAIL, complaint).catch(() => {});
     }
 
-    res.status(201).json({
-      success: true,
-      data: complaint
-    });
+    res.status(201).json({ success: true, data: complaint });
   } catch (err) {
     next(err);
   }
 };
 
-// GET ALL (public list or admin with filters/pagination)
 exports.getComplaints = async (req, res, next) => {
   try {
     const isAdmin = Boolean(req.admin);
@@ -120,18 +120,16 @@ exports.getComplaints = async (req, res, next) => {
         { description: { $regex: search, $options: 'i' } },
         { 'location.address': { $regex: search, $options: 'i' } },
         { trackingId: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
+        { email: { $regex: search, $options: 'i' } },
       ];
     }
 
     const [complaints, total] = await Promise.all([
       Complaint.find(query).sort({ createdAt: -1 }).skip(skip).limit(limitNum),
-      Complaint.countDocuments(query)
+      Complaint.countDocuments(query),
     ]);
 
-    const data = isAdmin
-      ? complaints
-      : complaints.map((c) => sanitizePublicComplaint(c));
+    const data = isAdmin ? complaints : complaints.map((complaint) => sanitizePublicComplaint(complaint));
 
     res.json({
       success: true,
@@ -139,14 +137,13 @@ exports.getComplaints = async (req, res, next) => {
       total,
       page: pageNum,
       pages: Math.max(1, Math.ceil(total / limitNum)),
-      data
+      data,
     });
   } catch (err) {
     next(err);
   }
 };
 
-// TRACK BY ID (public)
 exports.trackById = async (req, res, next) => {
   try {
     const trackingId = String(req.params.trackingId || '').trim().toUpperCase();
@@ -159,16 +156,12 @@ exports.trackById = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Complaint not found' });
     }
 
-    res.json({
-      success: true,
-      data: [sanitizePublicComplaint(complaint)]
-    });
+    res.json({ success: true, data: [sanitizePublicComplaint(complaint)] });
   } catch (err) {
     next(err);
   }
 };
 
-// TRACK BY EMAIL (public)
 exports.trackByEmail = async (req, res, next) => {
   try {
     const email = String(req.params.email || '').trim().toLowerCase();
@@ -181,37 +174,26 @@ exports.trackByEmail = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'No complaints found' });
     }
 
-    res.json({
-      success: true,
-      data: complaints.map((c) => sanitizePublicComplaint(c))
-    });
+    res.json({ success: true, data: complaints.map((complaint) => sanitizePublicComplaint(complaint)) });
   } catch (err) {
     next(err);
   }
 };
 
-// GET ONE (admin)
 exports.getComplaintById = async (req, res, next) => {
   try {
     const complaint = await Complaint.findById(req.params.id);
 
     if (!complaint) {
-      return res.status(404).json({
-        success: false,
-        message: 'Complaint not found'
-      });
+      return res.status(404).json({ success: false, message: 'Complaint not found' });
     }
 
-    res.json({
-      success: true,
-      data: complaint
-    });
+    res.json({ success: true, data: complaint });
   } catch (err) {
     next(err);
   }
 };
 
-// UPDATE STATUS (admin)
 exports.updateStatus = async (req, res, next) => {
   try {
     const updatePayload = { status: req.body.status };
@@ -222,64 +204,35 @@ exports.updateStatus = async (req, res, next) => {
       updatePayload.resolvedAt = new Date();
     }
 
-    const complaint = await Complaint.findByIdAndUpdate(
-      req.params.id,
-      updatePayload,
-      { new: true }
-    );
+    const complaint = await Complaint.findByIdAndUpdate(req.params.id, updatePayload, { new: true });
 
     if (!complaint) {
-      return res.status(404).json({
-        success: false,
-        message: 'Complaint not found'
-      });
+      return res.status(404).json({ success: false, message: 'Complaint not found' });
     }
 
     const notes = typeof updatePayload.adminNotes === 'string' ? updatePayload.adminNotes : complaint.adminNotes;
+
     if (complaint.status === 'Resolved') {
-      sendResolutionEmail(
-        complaint.email,
-        complaint.name,
-        complaint.issueType,
-        complaint._id,
-        notes || ''
-      ).catch(() => {});
+      sendResolutionEmail(complaint.email, complaint.name, complaint.issueType, complaint._id, notes || '').catch(() => {});
     } else {
-      sendStatusUpdateEmail(
-        complaint.email,
-        complaint.name,
-        complaint.issueType,
-        complaint.status,
-        complaint._id,
-        notes || ''
-      ).catch(() => {});
+      sendStatusUpdateEmail(complaint.email, complaint.name, complaint.issueType, complaint.status, complaint._id, notes || '').catch(() => {});
     }
 
-    res.json({
-      success: true,
-      data: complaint
-    });
+    res.json({ success: true, data: complaint });
   } catch (err) {
     next(err);
   }
 };
 
-// DELETE (admin)
 exports.deleteComplaint = async (req, res, next) => {
   try {
     const complaint = await Complaint.findByIdAndDelete(req.params.id);
 
     if (!complaint) {
-      return res.status(404).json({
-        success: false,
-        message: 'Complaint not found'
-      });
+      return res.status(404).json({ success: false, message: 'Complaint not found' });
     }
 
-    res.json({
-      success: true,
-      message: 'Complaint deleted'
-    });
+    res.json({ success: true, message: 'Complaint deleted' });
   } catch (err) {
     next(err);
   }

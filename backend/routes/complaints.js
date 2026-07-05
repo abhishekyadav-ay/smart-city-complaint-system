@@ -11,17 +11,19 @@ const {
   trackByEmail,
   getComplaintById,
   updateStatus,
-  deleteComplaint
+  deleteComplaint,
 } = require('../controllers/complaintController');
 
-router.post('/', (req, res, next) => {
+const handleUpload = (req, res, next) => {
   upload.single('image')(req, res, (err) => {
     if (err) {
       return res.status(400).json({ success: false, message: err.message });
     }
     next();
   });
-}, createComplaint);
+};
+
+router.post('/', handleUpload, createComplaint);
 router.get('/track/:trackingId', trackById);
 router.get('/track/email/:email', trackByEmail);
 router.get('/', optionalAuth, getComplaints);

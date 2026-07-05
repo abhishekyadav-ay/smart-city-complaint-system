@@ -9,7 +9,10 @@ const API_BASE = (() => {
     return configured.replace(/\/$/, '');
   }
 
-  if (window.location.protocol === 'file:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+  const host = (window.location.hostname || '').replace(/^\[|\]$/g, '');
+  const isLocalHost = ['localhost', '127.0.0.1', '::1', '0.0.0.0'].includes(host);
+
+  if (window.location.protocol === 'file:' || isLocalHost) {
     return 'http://localhost:5000/api';
   }
 
@@ -130,19 +133,9 @@ function setupCategoryButtons() {
   });
 }
 
-function highlightCategory(cat) {
-  const catBtns = document.querySelectorAll('.cat-btn');
-  catBtns.forEach((btn) => {
-    btn.classList.toggle('selected', btn.dataset.cat === cat);
-  });
-  selectedCategory = cat;
-  document.getElementById('issueType').value = cat;
-}
-
 function highlightCategories(categories) {
   const selected = new Set(categories);
-  const catBtns = document.querySelectorAll('.cat-btn');
-  catBtns.forEach((btn) => {
+  document.querySelectorAll('.cat-btn').forEach((btn) => {
     btn.classList.toggle('selected', selected.has(btn.dataset.cat));
   });
 }
@@ -212,11 +205,6 @@ function setupAIDetect() {
       aiBtn.disabled = false;
     }
   });
-}
-
-function clientSideClassify(text) {
-  const detected = detectIssuePriorities(text);
-  return detected[0]?.issueType || 'Others';
 }
 
 function detectIssuePriorities(text) {
@@ -372,41 +360,33 @@ function setupForm() {
     }
 
     const btn = document.getElementById('submitBtn');
+    const btnText = btn.querySelector('.btn-text');
+    const btnIcon = btn.querySelector('.btn-icon');
     btn.disabled = true;
-    btn.querySelector('.btn-text').textContent = 'Submitting...';
-    btn.querySelector('.btn-icon').textContent = '⏳';
+    btnText.textContent = 'Submitting...';
+    btnIcon.textContent = '⏳';
 
     try {
       const formData = new FormData(form);
-
-      const res = await fetch(`${API_BASE}/complaints`, {
-        method: 'POST',
-        body: formData,
-      });
-
+      const res = await fetch(`${API_BASE}/complaints`, { method: 'POST', body: formData });
       const data = await res.json();
 
       if (!res.ok) throw new Error(data.message || 'Submission failed');
 
       const createdComplaint = data.data || data.complaint || {};
-
-      // Show success
       form.style.display = 'none';
       const successEl = document.getElementById('successMsg');
       document.getElementById('successText').textContent =
         `Your "${createdComplaint.issueType || 'issue'}" report has been received and categorized. We'll update you via email once it's resolved.`;
-      
-      // Show tracking info
+
       const trackingInfo = document.getElementById('trackingInfo');
       const trackingIdDisplay = document.getElementById('trackingIdDisplay');
       if (createdComplaint.trackingId) {
         trackingIdDisplay.textContent = createdComplaint.trackingId;
         trackingInfo.style.display = 'block';
       }
-      
-      successEl.style.display = 'block';
 
-      // Refresh complaints and stats
+      successEl.style.display = 'block';
       setTimeout(() => {
         loadComplaints();
         loadPublicStats();
@@ -417,21 +397,21 @@ function setupForm() {
       showToast(err.message || 'Failed to submit. Please try again.', 'error');
     } finally {
       btn.disabled = false;
-      btn.querySelector('.btn-text').textContent = 'Submit Complaint';
-      btn.querySelector('.btn-icon').textContent = '→';
+      btnText.textContent = 'Submit Complaint';
+      btnIcon.textContent = '→';
     }
   });
 
-  // Reset button
   document.getElementById('resetBtn')?.addEventListener('click', () => {
-    document.getElementById('complaintForm').reset();
-    document.getElementById('complaintForm').style.display = 'block';
+    const resetForm = document.getElementById('complaintForm');
+    resetForm.reset();
+    resetForm.style.display = 'block';
     document.getElementById('successMsg').style.display = 'none';
     document.getElementById('aiResult').style.display = 'none';
     setAIMetadataField([]);
     document.getElementById('uploadPreview').style.display = 'none';
     document.getElementById('uploadContent').style.display = 'block';
-    document.querySelectorAll('.cat-btn').forEach((b) => b.classList.remove('selected'));
+    document.querySelectorAll('.cat-btn').forEach((button) => button.classList.remove('selected'));
     selectedCategory = '';
   });
 }

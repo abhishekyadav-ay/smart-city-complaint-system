@@ -1,8 +1,6 @@
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
-const AWS = require('aws-sdk');
-const multerS3 = require('multer-s3');
 
 // Ensure uploads directory exists
 const uploadDir = path.join(__dirname, '../uploads');
@@ -10,11 +8,12 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Disk storage configuration
 let storage;
 
 if (process.env.USE_S3 === 'true') {
-  // Configure AWS SDK
+  const AWS = require('aws-sdk');
+  const multerS3 = require('multer-s3');
+
   AWS.config.update({
     accessKeyId: process.env.AWS_ACCESS_KEY_ID,
     secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
@@ -35,7 +34,6 @@ if (process.env.USE_S3 === 'true') {
     },
   });
 } else {
-  // Disk storage configuration
   storage = multer.diskStorage({
     destination: (req, file, cb) => {
       cb(null, uploadDir);

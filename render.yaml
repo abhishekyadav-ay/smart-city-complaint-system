@@ -1,24 +1,30 @@
 # Render Blueprint — https://render.com/docs/blueprint-spec
-# After deploy: copy the service URL, set Netlify redirect to:
-#   https://YOUR-SERVICE.onrender.com/api/:splat
-# and set FRONTEND_URL (and secrets) on this service in the Render dashboard.
+# Deploy using: https://dashboard.render.com/new/blueprint
+# This file tells Render exactly how to build and run the backend
 
 services:
   - type: web
     name: smart-city-api
     runtime: node
-    region: oregon
+    region: singapore
     plan: free
     rootDir: backend
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /api/health
+    healthCheckTimeout: 30
     envVars:
+      - key: NODE_ENV
+        value: production
       - key: NODE_VERSION
         value: "20"
+      - key: PORT
+        value: "5000"
       - key: MONGO_URI
         sync: false
       - key: JWT_SECRET
+        sync: false
+      - key: ADMIN_SECRET_KEY
         sync: false
       - key: FRONTEND_URL
         sync: false
@@ -28,7 +34,15 @@ services:
         sync: false
       - key: EMAIL_PASS
         sync: false
+      - key: EMAIL_SMTP_HOST
+        sync: false
+      - key: EMAIL_SMTP_PORT
+        sync: false
+      - key: EMAIL_SMTP_SECURE
+        sync: false
       - key: ADMIN_EMAIL
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      - key: USE_S3
+        value: "false"
