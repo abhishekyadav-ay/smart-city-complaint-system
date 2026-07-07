@@ -164,18 +164,18 @@ Open http://localhost:3000 for the public form and http://localhost:3000/admin.h
 
 ## 🛠️ Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Backend | Node.js + Express.js |
-| Database | MongoDB + Mongoose |
-| Auth | JWT + bcryptjs |
-| AI | OpenAI GPT-3.5-turbo |
-| Email | NodeMailer (Gmail) |
-| Images | Multer (local disk) |
-| Maps | Leaflet + OpenStreetMap (Nominatim for geocoding) |
-| Charts | Chart.js v4 |
-| Frontend | Vanilla HTML/CSS/JS |
-| Fonts | DM Sans + DM Serif Display |
+| Layer    | Technology |
+|----------|-----------|
+| Backend  | Node.js + Express.js |
+| Database | MongoDB + Mongoose   |
+| Auth     | JWT + bcryptjs       |
+| AI       | OpenAI GPT-3.5-turbo |
+| Email    | NodeMailer (Gmail)   |
+| Images   | Multer (local disk)  |
+| Maps     | Leaflet + OpenStreetMap (Nominatim for geocoding) |
+| Charts   | Chart.js v4          |
+| Frontend | Vanilla HTML/CSS/JS  |
+| Fonts    | DM Sans + DM Serif Display |
 
 ---
 
